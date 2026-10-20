@@ -78,4 +78,4 @@ Apple 계정과 앱 전용 암호는 Mac의 터미널에서 `python3 scripts/reg
 - 로컬 `actionlint`, 타입 검사와 빌드 통과. 게시 도중 최신 피드가 바뀌는 경우와 동일 산출물 재시도까지 포함해 단위 테스트 76개 통과.
 - 사용자의 요청으로 `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_TEAM_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`을 등록했다. 인증서는 해당 앱의 Developer ID Application 인증서와 개인 키만 선택해 암호화했고 임시 파일은 삭제했다.
 - `to3mato-github-release` Cloudflare 토큰을 해당 계정의 R2 편집 권한으로 발급했다. 토큰 활성 상태와 `to3mato-downloads` 버킷 접근을 확인했다.
-- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`는 iCloud 키체인의 화면 공유 제한 때문에 미등록 상태다. 위 비공개 입력 도구로 등록할 수 있다. 실제 서명·공증·R2 자동 배포는 해당 자격 증명 등록 후 새 버전에서 검증해야 한다.
+- 사용자가 비공개 입력 도구로 `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`를 등록했고 필수 Secrets 7개가 모두 존재함을 확인했다. 실제 서명·공증·R2 자동 배포 결과는 아래 릴리스 기록에 남긴다.

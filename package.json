@@ -1,6 +1,6 @@
 {
   "name": "to3mato",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "To3mato desktop planner",
   "author": "To3mato",
@@ -47,7 +47,7 @@
       "identity": null,
       "entitlements": "electron/entitlements.mac.plist",
       "extendInfo": {
-        "NSCameraUsageDescription": "\uc9d1\uc911\uc744 \ub9c8\uce5c \uc21c\uac04\uc744 3\ucd08 \uc601\uc0c1\uc73c\ub85c \ub0a8\uae30\uae30 \uc704\ud574 \uce74\uba54\ub77c\ub97c \uc0ac\uc6a9\ud569\ub2c8\ub2e4."
+        "NSCameraUsageDescription": "집중을 마친 순간을 3초 영상으로 남기기 위해 카메라를 사용합니다."
       },
       "icon": "electron/assets/icon.icns"
     },
