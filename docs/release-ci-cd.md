@@ -12,7 +12,7 @@
 | Actions 수동 실행, `deploy=true` | `release/<버전>` 브랜치에서만 배포 |
 | `main` 푸시 | 자동 실행 없음 |
 
-브랜치명은 `package.json`과 `package-lock.json`의 버전과 일치해야 한다. 예를 들어 버전이 `0.3.1`이면 `release/0.3.1`을 사용한다. 사전 공개 버전은 배포하지 않는다. 현재 정식 배포는 `0.3.0`이므로 다음 배포에는 새 버전이 필요하다.
+브랜치명은 `package.json`과 `package-lock.json`의 버전과 일치해야 한다. 예를 들어 버전이 `0.3.2`이면 `release/0.3.2`를 사용한다. 사전 공개 버전은 배포하지 않는다. 현재 정식 배포는 `0.3.1`이므로 다음 배포에는 새 버전이 필요하다.
 
 ## 작업 구성
 
@@ -47,9 +47,9 @@ Apple 계정과 앱 전용 암호는 Mac의 터미널에서 `python3 scripts/reg
 
 ## 릴리스 절차
 
-1. 검증할 변경을 포함하고 `npm version 0.3.1 --no-git-tag-version`처럼 새 버전을 지정한다. 버전은 예시이며 실제 다음 버전을 사용한다.
-2. `release/0.3.1` 브랜치에 해당 변경과 버전 파일을 커밋한다.
-3. `git push -u origin release/0.3.1`로 자동화를 시작한다. 검증을 통과하면 R2의 정식 업데이트 피드가 바뀐다.
+1. 검증할 변경을 포함하고 `npm version 0.3.2 --no-git-tag-version`처럼 새 버전을 지정한다. 버전은 예시이며 실제 다음 버전을 사용한다.
+2. `release/0.3.2` 브랜치에 해당 변경과 버전 파일을 커밋한다.
+3. `git push -u origin release/0.3.2`로 자동화를 시작한다. 검증을 통과하면 R2의 정식 업데이트 피드가 바뀐다.
 4. Actions에서 네 작업의 성공과 공개 업데이트 피드의 버전을 확인한다.
 5. 릴리스 변경을 `main`에 반영한다. 배포된 버전의 파일을 수정해 재빌드하지 않는다.
 
@@ -79,3 +79,11 @@ Apple 계정과 앱 전용 암호는 Mac의 터미널에서 `python3 scripts/reg
 - 사용자의 요청으로 `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_TEAM_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`을 등록했다. 인증서는 해당 앱의 Developer ID Application 인증서와 개인 키만 선택해 암호화했고 임시 파일은 삭제했다.
 - `to3mato-github-release` Cloudflare 토큰을 해당 계정의 R2 편집 권한으로 발급했다. 토큰 활성 상태와 `to3mato-downloads` 버킷 접근을 확인했다.
 - 사용자가 비공개 입력 도구로 `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`를 등록했고 필수 Secrets 7개가 모두 존재함을 확인했다. 실제 서명·공증·R2 자동 배포 결과는 아래 릴리스 기록에 남긴다.
+
+## 0.3.1 릴리스 (2026-10-20)
+
+- 브랜치 `release/0.3.1`, 커밋 `8e2377555d7b9b6ea6f9d798400c16d24b371817`, 태그 `v0.3.1`.
+- [릴리스 실행](https://github.com/kimdoyeong/to3mato/actions/runs/39367667966)의 Validate, macOS tests and package, Sign and notarize, Publish to R2가 모두 성공했다. 단위 테스트 76개, 브라우저·Electron 테스트, 패키징 앱 검사, 앱·DMG 서명과 공증을 통과했다.
+- 공개 `latest-mac.yml`과 `release.json`이 `0.3.1`임을 확인했다. CI는 게시 파일의 공개 다운로드 해시를 검증했다.
+- 공개 주소에서 DMG를 다시 내려받아 SHA-256·크기를 대조했고, `codesign --verify`, `stapler validate`, Gatekeeper 검사에서 `Notarized Developer ID` 승인을 확인했다.
+- [macOS Apple Silicon 설치 파일](https://downloads.to3mato.doyeong.dev/To3mato-0.3.1-arm64.dmg). 앱과 업데이트 피드의 배포이며 다운로드 웹사이트는 이번에 재배포하지 않았다.
