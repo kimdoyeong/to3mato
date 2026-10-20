@@ -229,3 +229,9 @@ TO3MATO_SIGNED_UPDATE_TEST=1 npx playwright test tests/signed-update.spec.ts
 `--dir`만으로 빌드하면 macOS 업데이트에 필요한 `app-update.yml`이 포함되지 않으므로 이전 앱도 ZIP 타깃으로 만듭니다. 위 명령은 기본 키체인 프로필 `to3mato-notary`를 사용합니다. 두 빌드가 모두 완료된 뒤 테스트를 실행합니다. 일반 `test:ui`에서는 이 테스트를 건너뜁니다.
 
 테스트는 각 실행에 새 데이터 폴더를 만들고 두 가지 설치 경로를 확인합니다. `restart`는 서버 오류와 변조 ZIP 거부 뒤 정상 업데이트를 받아 **다시 시작**으로 설치하며 실제 자동 재실행된 앱의 버전과 데이터를 읽습니다. `quit`는 설치 준비가 끝난 앱을 일반 종료하고 자동 재실행 없이 교체되는지 확인한 뒤 수동 실행하여 데이터를 읽습니다. 결과·스크린샷·프로세스 로그는 `release/update-integration/run-restart-*/`와 `run-quit-*/`에 저장합니다. 최신 실행 경로는 `release/update-integration/latest-restart.json`과 `latest-quit.json`에 기록합니다. 제품 소스와 두 빌드의 핵심 파일 일치 결과는 `source-verification.json`에 있습니다.
+
+## 릴리스 CI/CD
+
+`release/<버전>` 브랜치에 푸시하면 GitHub Actions가 검증·macOS 테스트·서명·공증을 거쳐 Cloudflare R2에 앱을 배포합니다. 브랜치명과 `package.json`·`package-lock.json`의 버전이 일치해야 합니다. PR과 기본 수동 실행은 검증만 수행합니다.
+
+실행 조건, 필수 Secrets 7개, 배포 순서와 실패 재시도는 [릴리스 CI/CD 문서](docs/release-ci-cd.md)를 따릅니다.

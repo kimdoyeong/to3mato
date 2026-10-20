@@ -3,7 +3,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { DOWNLOAD_URL, FEED_NAME, verifyRelease } from './release-files.mjs';
+import {
+  DOWNLOAD_URL,
+  FEED_NAME,
+  verifyRelease,
+  releaseNames,
+} from './release-files.mjs';
 
 export function uploadObject(directory, filename, cacheControl) {
   const contentType = filename.endsWith('.yml')
@@ -55,6 +60,39 @@ async function verifyRemote(filename, expected, fetchImpl) {
     throw new Error(`Remote checksum/size mismatch: ${filename}`);
 }
 
+// A slow run for an older release branch must never roll back the shared feed.
+export async function ensureReleaseIsCurrent(
+  version,
+  fetchImpl = fetch,
+  allowSame = true,
+) {
+  releaseNames(version);
+  const url = new URL(FEED_NAME, DOWNLOAD_URL);
+  url.searchParams.set('check', String(Date.now()));
+  const response = await fetchImpl(url, {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (response.status === 404) return;
+  if (!response.ok)
+    throw new Error(`Cannot read current update feed (${response.status})`);
+  const { load } = await import('js-yaml');
+  const current = load(await response.text())?.version;
+  releaseNames(current);
+  const compare = (a, b) => {
+    const left = a.split('.').map(BigInt),
+      right = b.split('.').map(BigInt);
+    for (let i = 0; i < 3; i++)
+      if (left[i] !== right[i]) return left[i] > right[i] ? 1 : -1;
+    return 0;
+  };
+  const order = compare(version, current);
+  if (order < 0 || (order === 0 && !allowSame))
+    throw new Error(
+      `Release ${version} must be newer than published ${current}`,
+    );
+}
+
 export async function uploadRelease({
   directory,
   version,
@@ -62,6 +100,7 @@ export async function uploadRelease({
   fetchImpl = fetch,
 }) {
   const verified = await verifyRelease(directory, version);
+  await ensureReleaseIsCurrent(version, fetchImpl);
   // Verify publicly served artifacts before making the new feed visible.
   for (const artifact of verified.artifacts) {
     // Versioned objects are immutable; allow a retry of the same bytes only.
@@ -82,6 +121,7 @@ export async function uploadRelease({
     );
     await verifyRemote(artifact.filename, artifact, fetchImpl);
   }
+  await ensureReleaseIsCurrent(version, fetchImpl);
   await upload(directory, 'release.json', 'no-cache');
   await upload(directory, 'SHA256SUMS.txt', 'no-cache');
   // Revalidate in case a local build was changed while the upload was running.

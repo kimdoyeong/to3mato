@@ -29,6 +29,9 @@ const notary = (args) =>
       ...args,
       '--keychain-profile',
       profile,
+      ...(process.env.APPLE_KEYCHAIN
+        ? ['--keychain', process.env.APPLE_KEYCHAIN]
+        : []),
       '--output-format',
       'json',
     ]),
@@ -89,6 +92,8 @@ const validateBundles = (zipPath) => {
 };
 
 try {
+  if (process.argv.slice(2).some((arg) => arg !== '--wait'))
+    throw new Error('Usage: notarize-mac.mjs [--wait]');
   if (process.platform !== 'darwin') throw new Error('macOS에서 실행하세요.');
   if (!fs.existsSync(dmg))
     throw new Error('먼저 npm run dist:mac을 실행하세요.');
@@ -130,6 +135,8 @@ try {
     save(receipt);
     console.log(`Apple 공증 제출: ${receipt.id}`);
   }
+  if (process.argv.includes('--wait'))
+    notary(['wait', receipt.id, '--timeout', '45m']);
   const info = notary(['info', receipt.id]);
   receipt.status = info.status;
   save(receipt);
