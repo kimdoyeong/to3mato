@@ -198,6 +198,10 @@ test('tray displays and popover share the desktop timer and close with the main 
         payload: { id: 't2' },
       });
     });
+    await expect(popover.locator('#tray-status')).toHaveText('휴식 중');
+    await expect(popover.locator('#tray-primary')).toHaveText('일시정지');
+    await popover.locator('#tray-primary').click();
+    await expect(popover.locator('#tray-status')).toHaveText('휴식 대기');
     await expect(popover.locator('#tray-primary')).toHaveText('휴식 시작');
     await popover.locator('#tray-primary').click();
     await expect(popover.locator('#tray-status')).toHaveText('휴식 중');

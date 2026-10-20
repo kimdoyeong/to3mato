@@ -311,7 +311,7 @@ export function advanceTimer(state, now = Date.now()) {
       duration: state.settings.rest,
       elapsed: 0,
       startedAt: now,
-      running: false,
+      running: true,
     };
   return true;
 }

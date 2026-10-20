@@ -34,7 +34,7 @@ test('background focus and rest completion notify once and clicking restores the
     await page.evaluate(() =>
       window.to3mato!.dispatch({
         type: 'settings:save',
-        payload: { focus: 1, rest: 1 },
+        payload: { focus: 1, rest: 3 },
       }),
     );
     await page
@@ -52,12 +52,12 @@ test('background focus and rest completion notify once and clicking restores the
       },
       {
         title: '집중 타이머 끝',
-        body: '프로젝트 아이디어 정리 · 1포모도로 완료. 휴식을 시작하세요.',
+        body: '프로젝트 아이디어 정리 · 1포모도로 완료. 휴식 시간입니다',
       },
     ]);
     expect(
       (await page.evaluate(() => window.to3mato!.load())).timer?.running,
-    ).toBe(false);
+    ).toBe(true);
     await app.evaluate(() =>
       (globalThis as any).timerNotices[1].instance.emit('click'),
     );
@@ -71,10 +71,20 @@ test('background focus and rest completion notify once and clicking restores the
       ),
     ).toBe(true);
     await page.reload();
-    await page.getByRole('button', { name: '휴식 시작', exact: true }).click();
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((window) => !window.webContents.getURL().endsWith('/tray.html'))!
+        .hide(),
+    );
     await expect
       .poll(async () => (await notices()).map((n: any) => n.title))
-      .toEqual(['집중 시작', '집중 타이머 끝', '휴식 시작', '휴식 끝']);
+      .toEqual(['집중 시작', '집중 타이머 끝', '휴식 끝']);
+    const rested = await page.evaluate(() => window.to3mato!.load());
+    expect(rested.timer).toBe(null);
+    expect(rested.records).toHaveLength(1);
+    await app.evaluate(() =>
+      (globalThis as any).timerNotices[2].instance.emit('click'),
+    );
     await page.evaluate(() =>
       window.to3mato!.dispatch({
         type: 'settings:save',
@@ -93,7 +103,6 @@ test('background focus and rest completion notify once and clicking restores the
     expect((await notices()).map((n: any) => n.title)).toEqual([
       '집중 시작',
       '집중 타이머 끝',
-      '휴식 시작',
       '휴식 끝',
       '집중 시작',
       '집중 시작',

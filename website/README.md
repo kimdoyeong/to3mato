@@ -43,9 +43,9 @@ node scripts/capture-site-screenshots.mjs
 
 ## 설치 파일
 
-현재 파일은 `To3mato-0.3.0-arm64.dmg`입니다. Apple Silicon과 macOS 13 이상용입니다. v0.3.0은 Developer ID Application 서명과 Apple 공증, 인증 정보 부착 및 검증을 완료했습니다. 2026-10-20 공증된 설치 파일을 R2에 업로드하고 다운로드 사이트의 링크·버전·용량과 릴리스 메타데이터를 갱신해 Cloudflare Pages에 배포했습니다. 기존 버전 파일은 보존했습니다. Intel·Windows·Linux 파일은 제공하지 않습니다.
+운영 파일의 버전은 공개 `downloads/release.json`을 기준으로 확인합니다. 저장소의 `dist/download.html`은 릴리스 정보를 치환하는 템플릿입니다. Apple Silicon과 macOS 13 이상용입니다. v0.3.0은 Developer ID Application 서명과 Apple 공증, 인증 정보 부착 및 검증을 완료했습니다. 2026-10-20 공증된 설치 파일을 R2에 업로드하고 다운로드 사이트의 링크·버전·용량과 릴리스 메타데이터를 갱신해 Cloudflare Pages에 배포했습니다. 기존 버전 파일은 보존했습니다. Intel·Windows·Linux 파일은 제공하지 않습니다.
 
-앱 변경 시 `npm run dist:mac`으로 새 설치 파일을 만들고 `npm run notarize:mac`으로 공증을 제출합니다. 처리 중이라면 같은 명령으로 기존 제출 상태를 확인합니다. 승인 후 최종 검증이 완료된 `release/distribution/`의 DMG와 체크섬 및 릴리스 정보를 `website/dist/downloads/`에 복사합니다. 버전·용량·지원 환경을 `download.html`에 갱신하고 `downloads/release.json`과 `downloads/SHA256SUMS.txt`도 새 파일에 맞춰 갱신해야 합니다. 옛 설치 파일 링크를 남기지 않습니다.
+`release/*` CI가 서명·공증과 R2 공개 파일 검증을 마친 뒤 동일 산출물에서 버전·다운로드 링크·용량·체크섬을 생성하여 Pages에 배포합니다. 기존 소개와 변경 내역 문구는 수정하지 않습니다. 공개 다운로드 페이지와 메타데이터 검증까지 성공해야 릴리스가 완료됩니다.
 
 ## 검증
 
@@ -74,10 +74,10 @@ node scripts/check-website.mjs
 Cloudflare 계정에 `wrangler login`으로 로그인한 뒤 실행합니다. 인증 토큰은 저장소에 넣지 않습니다.
 
 ```sh
-npm run site:deploy
+SITE_RELEASE_DIR=release/distribution npm run site:deploy
 ```
 
-`site:prepare`는 공증된 DMG의 해시를 확인하고 `website/cloudflare-dist/`를 다시 만듭니다. DMG와 blockmap은 Pages 업로드에서 제외하며 다운로드 링크를 R2의 공개 주소로 연결합니다. 원본 `website/dist/`는 로컬 미리보기용 상대 링크를 유지합니다. `--force`는 Wrangler 4.151.2에서 Workers로 자동 전환하지 않고 Pages 배포 경로를 사용하기 위한 옵션입니다.
+`site:prepare`는 공증된 DMG의 해시를 확인하고 `website/cloudflare-dist/`를 다시 만듭니다. 설치 파일은 모두 Pages 업로드에서 제외하며 다운로드 링크를 R2의 공개 주소로 연결합니다. 원본 `website/dist/`는 로컬 미리보기용 상대 링크를 유지합니다. `--force`는 Wrangler 4.151.2에서 Workers로 자동 전환하지 않고 Pages 배포 경로를 사용하기 위한 옵션입니다.
 
 새 앱 버전을 배포할 때는 서명과 공증을 완료한 DMG 및 `SHA256SUMS.txt`와 `release.json`을 먼저 R2 버킷에 업로드합니다. DMG에는 `application/x-apple-diskimage`와 `Content-Disposition: attachment`를 지정합니다. R2의 실제 다운로드 체크섬을 확인한 뒤 사이트를 배포합니다.
 

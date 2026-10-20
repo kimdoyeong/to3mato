@@ -14,8 +14,8 @@ export function completedTimerNotification(state, now = Date.now()) {
   return {
     title: '집중 타이머 끝',
     body: task
-      ? `${task.title} · 1포모도로 완료. 휴식을 시작하세요.`
-      : '1포모도로 완료. 휴식을 시작하세요.',
+      ? `${task.title} · 1포모도로 완료. 휴식 시간입니다`
+      : '1포모도로 완료. 휴식 시간입니다',
   };
 }
 
@@ -23,6 +23,14 @@ export function startedTimerNotification(previous, next, now = Date.now()) {
   const timer = next.timer;
   if (!timer?.running) return null;
   const before = previous.timer;
+  // Focus completion already announces the automatically started rest.
+  if (
+    before?.running &&
+    before.phase === 'focus' &&
+    timer.phase === 'rest' &&
+    elapsedSeconds(before, now) >= before.duration
+  )
+    return null;
   if (
     before?.running &&
     before.phase === timer.phase &&

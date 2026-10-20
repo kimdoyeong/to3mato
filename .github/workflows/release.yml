@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: 'Sign, notarize and publish to R2 (release/<version> only)'
+        description: 'Sign, notarize, publish to R2 and update website (release/<version> only)'
         type: boolean
         default: false
 
@@ -168,7 +168,7 @@ jobs:
           fi
 
   publish:
-    name: Publish to R2
+    name: Publish app and website
     needs: sign
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -197,3 +197,20 @@ jobs:
         run: |
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/${GITHUB_REF#refs/}" --jq .object.sha)" = "$GITHUB_SHA"
           npm run release:upload
+      - name: Prepare website from the published release
+        env:
+          SITE_RELEASE_DIR: release/distribution
+        run: npm run site:prepare
+      - name: Deploy production website
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/${GITHUB_REF#refs/}" --jq .object.sha)" = "$GITHUB_SHA"
+          node --input-type=module -e 'import { ensureReleaseIsCurrent } from "./scripts/upload-release.mjs"; import fs from "node:fs"; await ensureReleaseIsCurrent(JSON.parse(fs.readFileSync("package.json")).version);'
+          npx --yes wrangler@4.151.2 pages deploy website/cloudflare-dist --project-name to3mato --branch main --commit-hash "$GITHUB_SHA" --commit-dirty=true --force
+      - name: Verify production website version, link and checksums
+        env:
+          SITE_RELEASE_DIR: release/distribution
+        run: node scripts/verify-site-release.mjs

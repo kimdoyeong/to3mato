@@ -58,9 +58,13 @@ test('timer completion records once and does not complete the task', () => {
   assert.equal(s.records.length, 1);
   assert.equal(s.records[0].seconds, 1500);
   assert.equal(s.timer.phase, 'rest');
-  assert.equal(s.timer.running, false);
+  assert.equal(s.timer.running, true);
   assert.equal(s.tasks[0].done, false);
-  advanceTimer(s, 1700000);
+  assert.equal(advanceTimer(s, 1700000), false);
+  assert.equal(elapsedSeconds(s.timer, 1700000), 100);
+  assert.equal(advanceTimer(s, 1900000), true);
+  assert.equal(s.timer, null);
+  assert.equal(advanceTimer(s, 1901000), false);
   assert.equal(s.records.length, 1);
 });
 test('changing settings leaves current timer duration unchanged', () => {
