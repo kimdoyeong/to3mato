@@ -69,3 +69,9 @@
 
 - [GitHub macOS 러너 사양](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 - [GitHub Actions Secrets 등록](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)
+
+## 최초 설정 검증 (2026-10-20)
+
+- [GitHub Actions 검증 실행](https://github.com/kimdoyeong/to3mato/actions/runs/39359511757): 기본 검증, macOS UI 테스트, 서명 없는 패키징과 패키징 앱 테스트 성공. `main`, `deploy=false`로 실행했으므로 서명·공증과 R2 게시는 실행하지 않았다.
+- 로컬 `actionlint`, 타입 검사와 빌드 통과. 게시 도중 최신 피드가 바뀌는 경우와 동일 산출물 재시도까지 포함해 단위 테스트 76개 통과.
+- `APPLE_TEAM_ID`를 기존 배포 팀 값으로 등록했다. 나머지 Secrets 6개는 등록이 필요하다. 실제 서명·공증·R2 자동 배포는 해당 자격 증명 등록 후 새 버전에서 검증해야 한다.

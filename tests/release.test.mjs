@@ -172,3 +172,36 @@ test('local validation failure prevents all network access', async (t) => {
   );
   assert.equal(called, false);
 });
+
+test('an older release never changes objects or the published update feed', async (t) => {
+  const f = await fixture(t);
+  await f.finish();
+  const r = remote(f);
+  r.objects.set(FEED_NAME, Buffer.from('version: 0.4.0\n'));
+  await assert.rejects(uploadRelease({ ...f, ...r }), /newer/);
+  assert.equal(r.uploads.length, 0);
+});
+
+test('a newer feed arriving during upload blocks shared metadata and feed writes', async (t) => {
+  const f = await fixture(t);
+  await f.finish();
+  const r = remote(f);
+  const upload = async (...args) => {
+    await r.upload(...args);
+    r.objects.set(FEED_NAME, Buffer.from('version: 0.4.0\n'));
+  };
+  await assert.rejects(uploadRelease({ ...f, ...r, upload }), /newer/);
+  assert.deepEqual(
+    r.uploads.map((item) => item.filename),
+    [f.names.zip, f.names.blockmap, f.names.dmg],
+  );
+});
+
+test('retrying the exact published artifacts is allowed', async (t) => {
+  const f = await fixture(t);
+  await f.finish();
+  const r = remote(f);
+  await uploadRelease({ ...f, ...r });
+  await uploadRelease({ ...f, ...r });
+  assert.equal(r.uploads.length, 12);
+});
