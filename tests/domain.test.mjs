@@ -14,6 +14,103 @@ import {
   validateRecordRow,
   validateSettings,
 } from '../src/lib/domain.mjs';
+test('project deletion detaches tasks and preserves records and the running timer', () => {
+  let state = applyCommand(
+    createInitialState(),
+    { type: 'timer:play', payload: { id: 't1' } },
+    0,
+  );
+  state = applyCommand(state, { type: 'timer:end' }, 600000);
+  state = applyCommand(
+    state,
+    { type: 'timer:play', payload: { id: 't1' } },
+    600000,
+  );
+  const before = structuredClone(state);
+  const deleted = applyCommand(
+    state,
+    { type: 'project:delete', payload: { id: 'p1' } },
+    601000,
+  );
+  assert.deepEqual(state, before);
+  assert.deepEqual(
+    deleted.projects,
+    before.projects.filter((p) => p.id !== 'p1'),
+  );
+  assert.deepEqual(
+    deleted.tasks,
+    before.tasks.map((task) => ({
+      ...task,
+      project: task.project === 'p1' ? '' : task.project,
+    })),
+  );
+  assert.deepEqual(deleted.records, before.records);
+  assert.deepEqual(deleted.timer, before.timer);
+  assert.deepEqual(normalizeState(deleted), deleted);
+  assert.throws(
+    () =>
+      applyCommand(
+        deleted,
+        {
+          type: 'project:delete',
+          payload: { id: 'p1' },
+        },
+        601000,
+      ),
+    /프로젝트를 찾을 수 없습니다/,
+  );
+});
+
+test('new estimates stop at six while legacy estimates can be loaded and retained', () => {
+  const state = createInitialState();
+  const task = { title: '새 작업', date: '', project: '' };
+  assert.equal(
+    applyCommand(state, {
+      type: 'task:save',
+      payload: { ...task, estimate: 6 },
+    }).tasks.at(-1).estimate,
+    6,
+  );
+  for (const estimate of [0, 1.5, 7, 48]) {
+    assert.throws(() =>
+      applyCommand(state, {
+        type: 'task:save',
+        payload: { ...task, estimate },
+      }),
+    );
+    assert.throws(() =>
+      applyCommand(state, {
+        type: 'task:batch',
+        payload: { project: 'p1', tasks: [{ ...task, estimate }] },
+      }),
+    );
+  }
+  state.tasks[0].estimate = 48;
+  const loaded = normalizeState(state);
+  const updated = applyCommand(loaded, {
+    type: 'task:save',
+    payload: { ...loaded.tasks[0], title: '기존 작업 수정' },
+  });
+  assert.equal(updated.tasks[0].estimate, 48);
+  assert.throws(() =>
+    applyCommand(updated, {
+      type: 'task:save',
+      payload: { ...updated.tasks[0], estimate: 7 },
+    }),
+  );
+  const reduced = applyCommand(updated, {
+    type: 'task:save',
+    payload: { ...updated.tasks[0], estimate: 6 },
+  });
+  assert.equal(reduced.tasks[0].estimate, 6);
+  assert.throws(() =>
+    applyCommand(reduced, {
+      type: 'task:save',
+      payload: { ...reduced.tasks[0], estimate: 48 },
+    }),
+  );
+});
+
 test('half-pomodoro rounding boundaries', () => {
   for (const [seconds, value] of [
     [0, 0],

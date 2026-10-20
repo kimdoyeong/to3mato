@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { state as appState, send, notify, message } from '../lib/client';
-  import { localDate } from '../lib/domain.mjs';
+  import { localDate, MAX_TASK_ESTIMATE } from '../lib/domain.mjs';
   import {
     generateTaskBatch,
     renderTaskTemplate,
@@ -151,7 +151,7 @@
             >공통 예상 포모도로<input
               type="number"
               min="1"
-              max="48"
+              max={MAX_TASK_ESTIMATE}
               step="1"
               required
               bind:value={estimate}
@@ -249,7 +249,7 @@
                     aria-label={`${index + 1}번 예상 포모도로`}
                     type="number"
                     min="1"
-                    max="48"
+                    max={MAX_TASK_ESTIMATE}
                     step="1"
                     bind:value={draft.estimate}
                     required

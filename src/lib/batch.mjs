@@ -1,4 +1,4 @@
-import { localDate, offsetDate } from './domain.mjs';
+import { localDate, offsetDate, MAX_TASK_ESTIMATE } from './domain.mjs';
 
 export const MAX_BATCH_SIZE = 500;
 export function tokenizeTemplate(template) {
@@ -56,7 +56,7 @@ export function generateTaskBatch({
   overrides = {},
 }) {
   positiveInteger(count, MAX_BATCH_SIZE, '생성 개수');
-  positiveInteger(estimate, 48, '예상 포모도로');
+  positiveInteger(estimate, MAX_TASK_ESTIMATE, '예상 포모도로');
   positiveInteger(perDay, MAX_BATCH_SIZE, '하루 기본 개수');
   if (
     typeof startDate !== 'string' ||

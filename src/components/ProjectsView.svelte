@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { state as appState } from '../lib/client';
+  import { state as appState, send, message } from '../lib/client';
   import Icon from './Icon.svelte';
   import Tomato from './Tomato.svelte';
   import TaskList from './TaskList.svelte';
@@ -16,13 +16,36 @@
     onproject: () => void;
   } = $props();
   let project = $derived($appState.projects.find((p) => p.id === selected));
+  let deleteDialog: HTMLDialogElement;
+  let deleting = $state(false);
+  let deleteError = $state('');
+  let deleteTarget = $state<{ id: string; name: string } | null>(null);
+  function confirmDelete() {
+    if (!project) return;
+    deleteTarget = { id: project.id, name: project.name };
+    deleteError = '';
+    deleteDialog.showModal();
+  }
+  async function deleteProject() {
+    if (!deleteTarget || deleting) return;
+    deleting = true;
+    const success = await send('project:delete', { id: deleteTarget.id });
+    deleting = false;
+    if (success) {
+      selected = null;
+      deleteDialog.close();
+    } else deleteError = $message || '삭제하지 못했습니다. 다시 시도하세요.';
+  }
 </script>
 
 {#if project}
   <button class="back-button" onclick={() => (selected = null)}
     ><Icon name="back" />모든 프로젝트</button
   >
-  <div class="intro"><div><h1>{project.name}</h1></div></div>
+  <div class="intro">
+    <div><h1>{project.name}</h1></div>
+    <button class="text-button" onclick={confirmDelete}>프로젝트 삭제</button>
+  </div>
   <TaskList
     tasks={$appState.tasks.filter((t) => t.project === selected)}
     {onedit}
@@ -60,3 +83,27 @@
     ><Icon name="plus" />프로젝트 추가</button
   >
 {/if}
+
+<dialog
+  bind:this={deleteDialog}
+  aria-labelledby="delete-project-title"
+  oncancel={(event) => {
+    if (deleting) event.preventDefault();
+  }}
+>
+  <div class="dialog-heading">
+    <h2 id="delete-project-title">프로젝트 삭제</h2>
+  </div>
+  <p>{deleteTarget?.name}</p>
+  {#if deleteError}<p class="form-error" role="alert">{deleteError}</p>{/if}
+  <div class="dialog-footer">
+    <button
+      class="text-button"
+      disabled={deleting}
+      onclick={() => deleteDialog.close()}>취소</button
+    >
+    <button class="primary" disabled={deleting} onclick={deleteProject}
+      >삭제</button
+    >
+  </div>
+</dialog>

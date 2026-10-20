@@ -1,4 +1,5 @@
 /** @typedef {import('./types').AppState} AppState */
+export const MAX_TASK_ESTIMATE = 6;
 export const localDate = (date = new Date()) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 export function offsetDate(offset, base = localDate()) {
@@ -89,8 +90,10 @@ function validDate(value) {
     throw new Error('날짜 형식이 올바르지 않습니다.');
   return value;
 }
-function taskFields(raw, projects) {
+function taskFields(raw, projects, existingEstimate = null) {
   const { title, estimate, date, project } = taskValues(raw);
+  // Older tasks may keep their original estimate when editing other fields.
+  if (estimate !== existingEstimate) number(estimate, 1, MAX_TASK_ESTIMATE);
   if (project && !projects.some((p) => p.id === project))
     throw new Error('프로젝트를 찾을 수 없습니다.');
   return { title, estimate, date, project };
@@ -324,7 +327,8 @@ export function applyCommand(input, command, now = Date.now()) {
   advanceTimer(state, now);
   switch (command.type) {
     case 'task:save': {
-      const fields = taskFields(p, state.projects);
+      const existing = state.tasks.find((t) => t.id === p.id);
+      const fields = taskFields(p, state.projects, existing?.estimate);
       if (p.id) {
         const task = state.tasks.find((t) => t.id === p.id);
         if (!task) throw new Error('할 일을 찾을 수 없습니다.');
@@ -379,6 +383,14 @@ export function applyCommand(input, command, now = Date.now()) {
       const task = state.tasks.find((t) => t.id === p.id);
       if (!task) throw new Error('할 일을 찾을 수 없습니다.');
       task.date = validDate(p.date);
+      break;
+    }
+    case 'project:delete': {
+      if (!state.projects.some((project) => project.id === p.id))
+        throw new Error('프로젝트를 찾을 수 없습니다.');
+      state.projects = state.projects.filter((project) => project.id !== p.id);
+      for (const task of state.tasks)
+        if (task.project === p.id) task.project = '';
       break;
     }
     case 'project:save': {

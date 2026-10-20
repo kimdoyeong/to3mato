@@ -10,7 +10,7 @@
     send,
     notify,
   } from './lib/client';
-  import { localDate } from './lib/domain.mjs';
+  import { localDate, MAX_TASK_ESTIMATE } from './lib/domain.mjs';
   import type { Task } from './lib/types';
   import Icon from './components/Icon.svelte';
   import TodoView from './components/TodoView.svelte';
@@ -39,6 +39,7 @@
     project = $state(''),
     projectName = $state(''),
     busy = $state(false);
+  let originalEstimate = $state(1);
   const tabs = [
     ['todo', '할 일', 'todo'],
     ['projects', '프로젝트', 'folder'],
@@ -68,6 +69,7 @@
     editing = task?.id || null;
     title = task?.title || '';
     estimate = task?.estimate || 1;
+    originalEstimate = estimate;
     date = task ? task.date : assignedDate;
     project = task?.project || assignedProject;
     await tick();
@@ -226,9 +228,12 @@
     <div class="form-grid">
       <label
         >예상 포모도로<select disabled={busy} bind:value={estimate}
-          >{#each Array.from({ length: 48 }, (_, i) => i + 1) as value}<option
+          >{#each Array.from({ length: MAX_TASK_ESTIMATE }, (_, i) => i + 1) as value}<option
               {value}>{value} 포모도로</option
-            >{/each}</select
+            >{/each}
+          {#if originalEstimate > MAX_TASK_ESTIMATE}<option
+              value={originalEstimate}>{originalEstimate} 포모도로</option
+            >{/if}</select
         ></label
       ><label
         >예정일<input disabled={busy} type="date" bind:value={date} /></label

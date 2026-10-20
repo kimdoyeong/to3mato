@@ -31,6 +31,104 @@ const ui = test.extend<{ appPage: Page }>({
 });
 
 ui(
+  'project deletion can be cancelled and persists without deleting tasks or history',
+  async ({ appPage: page }) => {
+    await page.evaluate(async () => {
+      await window.to3mato!.dispatch({
+        type: 'timer:play',
+        payload: { id: 't1' },
+      });
+      await window.to3mato!.dispatch({ type: 'timer:end' });
+      await window.to3mato!.dispatch({
+        type: 'timer:play',
+        payload: { id: 't1' },
+      });
+    });
+    const before = await page.evaluate(() => window.to3mato!.load());
+    await page.getByRole('button', { name: '프로젝트', exact: true }).click();
+    await page.getByRole('button', { name: /사이드 프로젝트/ }).click();
+    await page
+      .getByRole('button', { name: '프로젝트 삭제', exact: true })
+      .click();
+    const confirmation = page.getByRole('dialog', { name: '프로젝트 삭제' });
+    await expect(confirmation).toContainText('사이드 프로젝트');
+    await confirmation
+      .getByRole('button', { name: '취소', exact: true })
+      .click();
+    expect(
+      (await page.evaluate(() => window.to3mato!.load())).projects,
+    ).toEqual(before.projects);
+    await page
+      .getByRole('button', { name: '프로젝트 삭제', exact: true })
+      .click();
+    await confirmation
+      .getByRole('button', { name: '삭제', exact: true })
+      .click();
+    await expect(confirmation).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /사이드 프로젝트/ }),
+    ).toHaveCount(0);
+    await page.reload();
+    const after = await page.evaluate(() => window.to3mato!.load());
+    expect(after.projects).toHaveLength(before.projects.length - 1);
+    expect(after.tasks).toEqual(
+      before.tasks.map((task) => ({
+        ...task,
+        project: task.project === 'p1' ? '' : task.project,
+      })),
+    );
+    expect(after.records).toEqual(before.records);
+    expect(after.timer?.taskId).toBe('t1');
+    expect(after.timer?.running).toBe(true);
+  },
+);
+
+ui(
+  'single and batch task estimates are limited to six',
+  async ({ appPage: page }) => {
+    await page.getByRole('button', { name: '프로젝트', exact: true }).click();
+    await page.getByRole('button', { name: /사이드 프로젝트/ }).click();
+    await page.getByRole('button', { name: '할 일 추가', exact: true }).click();
+    const single = page.getByRole('dialog', {
+      name: '할 일 추가',
+      exact: true,
+    });
+    await expect(
+      single.getByLabel('예상 포모도로').locator('option'),
+    ).toHaveText([
+      '1 포모도로',
+      '2 포모도로',
+      '3 포모도로',
+      '4 포모도로',
+      '5 포모도로',
+      '6 포모도로',
+    ]);
+    await single.getByLabel('할 일 이름', { exact: true }).fill('6개 작업');
+    await single.getByLabel('예상 포모도로').selectOption('6');
+    await single.getByRole('button', { name: '저장', exact: true }).click();
+    expect(
+      (await page.evaluate(() => window.to3mato!.load())).tasks.at(-1)
+        ?.estimate,
+    ).toBe(6);
+    await page.getByRole('button', { name: '할 일 추가', exact: true }).click();
+    await single.getByRole('button', { name: '여러 개 추가' }).click();
+    const batch = page.getByRole('dialog', { name: '여러 할 일 추가' });
+    await expect(
+      batch.getByLabel('공통 예상 포모도로', { exact: true }),
+    ).toHaveAttribute('max', '6');
+    await batch.getByLabel('할 일 이름 규칙').fill('작업 %n%');
+    await batch.getByLabel('공통 예상 포모도로', { exact: true }).fill('6');
+    await batch.getByRole('button', { name: '목록 생성' }).click();
+    await expect(
+      batch.getByLabel('1번 예상 포모도로', { exact: true }),
+    ).toHaveAttribute('max', '6');
+    await expect(
+      batch.getByLabel('1번 예상 포모도로', { exact: true }),
+    ).toHaveValue('6');
+  },
+);
+
+ui(
   'task and project forms focus names and keep errors inside the dialog',
   async ({ appPage: page }) => {
     await page
