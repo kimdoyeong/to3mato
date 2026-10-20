@@ -1,0 +1,262 @@
+#app {
+  min-height: 100vh;
+}
+.startup {
+  padding: 40px;
+  font-size: 18px;
+}
+.setting-row label {
+  margin: 0;
+  font-size: inherit;
+}
+.file-input {
+  display: none;
+}
+.data-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.task-detail:focus-visible {
+  outline-offset: 6px;
+}
+.timer-panel h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+button:disabled {
+  pointer-events: none;
+}
+dialog .dialog-footer {
+  gap: 12px;
+}
+.today-row.done .today-name {
+  text-decoration: line-through;
+}
+.task-row {
+  min-width: 0;
+}
+.task-title {
+  min-width: 0;
+}
+.project-card h2 {
+  overflow-wrap: anywhere;
+}
+.toast {
+  white-space: normal;
+}
+.execution {
+  overscroll-behavior: contain;
+}
+input,
+select {
+  font-synthesis: none;
+}
+
+.add-mode {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: var(--peach);
+}
+.add-mode button {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 9px;
+}
+.add-mode button.selected {
+  background: var(--paper);
+  color: var(--red);
+  box-shadow: 0 2px 0 var(--line);
+}
+dialog.batch-dialog {
+  width: min(820px, calc(100vw - 40px));
+  max-width: none;
+  max-height: calc(100dvh - 40px);
+  padding: 24px;
+}
+.batch-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.batch-dialog .dialog-heading {
+  flex: none;
+  margin-bottom: 12px;
+}
+.batch-dialog .dialog-heading h2 {
+  margin: 0;
+}
+.batch-dialog .add-mode {
+  flex: none;
+  margin-bottom: 12px;
+}
+.batch-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.batch-scroll {
+  overflow: auto;
+  min-height: 0;
+  padding: 4px 5px 8px;
+}
+.batch-dialog .dialog-footer {
+  flex: none;
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  align-items: center;
+}
+.batch-help {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 5px 0 10px;
+}
+.batch-error {
+  font-size: 15px;
+  color: #aa3221;
+  margin: 8px 0;
+}
+.template-editor {
+  position: relative;
+  isolation: isolate;
+}
+.template-editor input,
+.template-paint {
+  font-family: inherit;
+  font-size: 19px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: normal;
+  padding: 10px 14px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  width: 100%;
+  margin: 0;
+}
+.template-editor input {
+  position: relative;
+  z-index: 1;
+  color: transparent;
+  caret-color: var(--ink);
+  background: transparent;
+  border-color: var(--line);
+}
+.template-editor input::placeholder {
+  color: var(--muted);
+}
+.template-paint {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+  background: var(--paper);
+}
+.template-number {
+  color: #9a38a1;
+  background: #f4e5f5;
+}
+.template-date {
+  color: #216c9b;
+  background: #e4f0f8;
+}
+.template-invalid,
+.template-incomplete {
+  color: #aa3221;
+  text-decoration: underline wavy;
+  text-underline-offset: 4px;
+}
+.weekday-field {
+  border: 0;
+  padding: 0;
+  margin: 10px 0 16px;
+  min-width: 0;
+}
+.weekday-field legend {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.weekday-picker {
+  display: flex;
+  gap: 8px;
+}
+.weekday-picker button {
+  flex: 1;
+  padding: 8px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.weekday-picker button.selected {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--peach);
+}
+.weekday-overrides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(65px, 1fr));
+  gap: 10px;
+}
+.weekday-overrides label {
+  margin: 0;
+}
+.weekday-overrides input {
+  min-width: 0;
+}
+.batch-review table {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  width: 100%;
+  table-layout: fixed;
+}
+.batch-review th {
+  text-align: left;
+  font-size: 15px;
+  font-weight: normal;
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 1;
+}
+.batch-review th:first-child {
+  width: 42px;
+}
+.batch-review th:nth-child(3) {
+  width: 90px;
+}
+.batch-review th:nth-child(4) {
+  width: 165px;
+}
+.batch-review td {
+  padding-right: 8px;
+}
+.batch-review input {
+  width: 100%;
+  min-width: 0;
+  font-size: 16px;
+  padding: 9px 8px;
+}
+@media (max-width: 600px) {
+  .batch-review table {
+    min-width: 620px;
+  }
+  dialog.batch-dialog {
+    padding: 18px;
+  }
+}
+
+.form-error {
+  color: var(--red-deep);
+  background: var(--peach);
+  border-left: 3px solid var(--red);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 16px 0 0;
+  font-size: 16px;
+}

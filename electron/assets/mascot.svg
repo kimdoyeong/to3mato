@@ -1,0 +1,31 @@
+<svg viewBox="0 -6 140 140" xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
+    <ellipse class="shadow" cx="70" cy="120" rx="38" ry="5" fill="#4a3128"></ellipse>
+    
+    <g class="hop">
+      <g class="body">
+        <path d="M70 32C52 20 14 27 12 67c-2 32 26 50 58 50s60-18 58-50c-2-40-40-47-58-35Z" fill="#ef5b43"></path>
+        <path d="M70 32C52 20 14 27 12 67c-1 12 3 22 10 31 6-34 28-58 48-66Z" fill="#f8765f" opacity=".55"></path>
+        <path d="M29 54c-3 8-3 15 0 22" stroke="#ffb5a5" stroke-width="7" stroke-linecap="round" fill="none"></path>
+        <g class="leaves">
+          <path d="M70 40 51 43l9-11-17-7 19-3-4-13 12 10 11-10-4 13 19 3-17 7 9 11Z" fill="#69a84f"></path>
+          <path d="M70 32c0-9 1-15 7-20" stroke="#4d8a3a" stroke-width="5" stroke-linecap="round" fill="none"></path>
+        </g>
+        <g class="face">
+          <g class="open-eyes">
+            <g class="eye">
+              <ellipse cx="49" cy="76" rx="5" ry="6" fill="#4a3128"></ellipse>
+              <circle cx="51" cy="73.5" r="1.8" fill="#fff"></circle>
+            </g>
+            <g class="eye">
+              <ellipse cx="91" cy="76" rx="5" ry="6" fill="#4a3128"></ellipse>
+              <circle cx="93" cy="73.5" r="1.8" fill="#fff"></circle>
+            </g>
+          </g>
+          
+          <ellipse cx="36" cy="88" rx="9" ry="5.5" fill="#ff8f7d" opacity=".75"></ellipse>
+          <ellipse cx="104" cy="88" rx="9" ry="5.5" fill="#ff8f7d" opacity=".75"></ellipse>
+          <path d="M62 87q8 10 16 0" fill="none" stroke="#4a3128" stroke-width="3" stroke-linecap="round"></path>
+        </g>
+      </g>
+    </g>
+  </svg>

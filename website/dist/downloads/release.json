@@ -1,0 +1,31 @@
+{
+  "version": "0.3.0",
+  "platform": "macOS",
+  "architecture": "arm64",
+  "filename": "To3mato-0.3.0-arm64.dmg",
+  "bytes": 144166240,
+  "sha256": "31e48c00b84124185077d7239b9b7061e991749b35c74ee58879c919214ff355",
+  "signed": true,
+  "notarized": true,
+  "notarizationId": "57870f7e-15d2-4ab5-8449-ad831f2e5e01",
+  "artifacts": [
+    {
+      "filename": "To3mato-0.3.0-arm64-mac.zip",
+      "bytes": 143539352,
+      "sha256": "c6c35093660a14c93053d661483e586d9e124518002a2f0df42f48a0a1e00584",
+      "sha512": "WAI2waaHaTe8LubE1HDnzetA6NWhRxCxrOcO/mcIH3R+WoUg9hoJLakNo+OZc9mOM7r0F02pPLmUow5ffB/yDQ=="
+    },
+    {
+      "filename": "To3mato-0.3.0-arm64-mac.zip.blockmap",
+      "bytes": 152419,
+      "sha256": "069e85a84705e45ca32bb79ba6febc19cfb8dfe2f6d43cf69acd8e8525f4361e",
+      "sha512": "yFY9HnHqfibKcPev6HD4dOlXPcT10Fo6K0kC5kUFBilvHh541IxxZkWkmOTe2dkbecaFaILNYvb6O+TAyrxiKA=="
+    },
+    {
+      "filename": "To3mato-0.3.0-arm64.dmg",
+      "bytes": 144166240,
+      "sha256": "31e48c00b84124185077d7239b9b7061e991749b35c74ee58879c919214ff355",
+      "sha512": "rBcUcmyUjdLHMWoOgtf1OhyZoPTOfi41nivc9vvy1E+RLGsiSNUdlw/HhF3GIpekClhjnn3mR836czEkyHJfbA=="
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "website",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4175",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "website/dist"
+      ],
+      "port": 4175
+    },
+    {
+      "name": "app-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:web"
+      ],
+      "port": 4173
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "name": "to3mato",
+  "version": "0.3.0",
+  "private": true,
+  "description": "To3mato desktop planner",
+  "author": "To3mato",
+  "type": "module",
+  "main": "electron/main.mjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --host 127.0.0.1 --port 4173 --strictPort",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "build": "vite build",
+    "test": "node --test tests/*.test.mjs",
+    "test:ui": "playwright test",
+    "start": "electron .",
+    "package": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "format": "prettier --write src electron scripts tests *.json *.ts *.js README.md",
+    "icons": "node scripts/generate-icons.mjs",
+    "dist:mac": "npm run build && electron-builder --mac --arm64 --config electron-builder.release.cjs --publish never",
+    "notarize:mac": "node scripts/notarize-mac.mjs",
+    "site:prepare": "node scripts/prepare-cloudflare-site.mjs",
+    "site:deploy": "npm run site:prepare && npx --yes wrangler@4.151.2 pages deploy website/cloudflare-dist --project-name to3mato --branch main --force",
+    "release:verify": "node scripts/upload-release.mjs --dry-run",
+    "release:upload": "node scripts/upload-release.mjs"
+  },
+  "build": {
+    "appId": "app.to3mato.desktop",
+    "productName": "To3mato",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "src/lib/domain.mjs",
+      "src/styles/theme.css",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ],
+      "identity": null,
+      "entitlements": "electron/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "\uc9d1\uc911\uc744 \ub9c8\uce5c \uc21c\uac04\uc744 3\ucd08 \uc601\uc0c1\uc73c\ub85c \ub0a8\uae30\uae30 \uc704\ud574 \uce74\uba54\ub77c\ub97c \uc0ac\uc6a9\ud569\ub2c8\ub2e4."
+      },
+      "icon": "electron/assets/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "electron/assets/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office",
+      "icon": "electron/assets/icon.png"
+    }
+  },
+  "dependencies": {
+    "@fontsource/gamja-flower": "^5.3.0",
+    "@fontsource/poor-story": "^5.3.0",
+    "electron-updater": "^6.8.9",
+    "svelte": "^5.57.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^26.6.5",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "js-yaml": "^5.5.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte-check": "^4.7.7",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.4"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

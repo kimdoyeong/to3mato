@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fff8ed" />
+    <title>다운로드 — To3mato for macOS</title>
+    <meta
+      name="description"
+      content="To3mato v0.3.0 macOS Apple Silicon 다운로드. 설치 방법과 지원 환경을 확인하세요."
+    />
+    <meta property="og:title" content="다운로드 — To3mato for macOS" />
+    <meta
+      property="og:description"
+      content="To3mato v0.3.0 macOS Apple Silicon 다운로드. 설치 방법과 지원 환경을 확인하세요."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="assets/mascot.svg" />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 이동</a>
+    <header class="site-header wrap">
+      <a class="brand" href="index.html" aria-label="To3mato 홈"
+        ><img src="assets/mascot.svg" width="44" height="44" alt="" /><span
+          >To3mato<span class="brand-period">.</span></span
+        ></a
+      >
+      <nav aria-label="주 메뉴">
+        <a href="index.html">홈</a><a href="about.html">소개</a
+        ><a href="download.html" aria-current="page">다운로드</a>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="download-layout wrap" aria-label="앱 다운로드">
+        <div class="download-card">
+          <div class="download-icon">
+            <img
+              src="assets/app-icon.png"
+              width="180"
+              height="180"
+              alt="To3mato 토마토 앱 아이콘"
+            /><span class="version-tag">v0.3.0</span>
+          </div>
+          <div class="download-card-body">
+            <h1>To3mato</h1>
+            <p>macOS 13 이상 · M 시리즈 칩이 탑재된 Mac용</p>
+            <a
+              class="button primary download-button"
+              href="downloads/To3mato-0.3.0-arm64.dmg"
+              download
+              >macOS용 다운로드 <span aria-hidden="true">↓</span></a
+            >
+            <p class="download-meta">DMG · 137.5 MB · arm64</p>
+            <a class="small-link" href="downloads/SHA256SUMS.txt" download
+              >SHA-256 체크섬 다운로드 ↗</a
+            >
+          </div>
+        </div>
+        <div class="install-guide">
+          <h2>설치 방법</h2>
+          <ol class="install-steps">
+            <li>
+              <span>1</span>
+              <div>
+                <h3>설치 파일 열기</h3>
+                <p>다운로드한 DMG 파일을 엽니다.</p>
+              </div>
+            </li>
+            <li>
+              <span>2</span>
+              <div>
+                <h3>응용 프로그램으로 이동</h3>
+                <p>To3mato를 Applications 폴더로 드래그합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span>3</span>
+              <div>
+                <h3>To3mato 실행</h3>
+                <p>응용 프로그램 폴더에서 앱을 실행합니다.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+      <section class="release-notes wrap" aria-labelledby="release-title">
+        <p class="eyebrow">v0.2.0 · 2026.10.20</p>
+        <h2 id="release-title">3초 집중 로그와 영상 편지 추가</h2>
+        <ul><li>집중 완료 후 선택해서 남기는 3초 웹캠 영상</li><li>날짜·시간·할 일 이름이 담긴 세로형 집중 로그</li><li>매주 월요일 오전 9시, 지난주 영상 편지 자동 배달</li><li>주별 클립 조회·재생·삭제와 받은 영상 다운로드</li></ul>
+        <a class="text-link" href="about.html#focus-log">새 기능 자세히 보기 ↗</a>
+      </section>
+      <section class="faq-section wrap">
+        <div>
+          <h2>자주 묻는 질문</h2>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>내 Mac이 Apple Silicon인지 어떻게 확인하나요?</summary>
+            <p>
+              화면 왼쪽 위 Apple 메뉴에서 ‘이 Mac에 관하여’를 엽니다. 칩 항목에
+              Apple M 시리즈가 표시되면 이 버전을 사용할 수 있습니다.
+            </p>
+          </details>
+          <details>
+            <summary>계정이나 인터넷 연결이 필요한가요?</summary>
+            <p>
+              필요하지 않습니다. 앱의 할 일 관리와 타이머는 로컬에서 동작합니다.
+              다운로드할 때만 인터넷 연결이 필요합니다.
+            </p>
+          </details>
+          <details><summary>카메라는 언제 켜지나요?</summary><p>집중 타이머 완료 후 “네, 남길게요”를 누른 경우에만 카메라 접근을 요청합니다. 첫 촬영 때 macOS 카메라 권한을 허용해야 합니다. 준비 카운트다운 뒤 약 3초 촬영하고 카메라를 끕니다. 마이크는 사용하지 않습니다.</p></details>
+          <details><summary>영상 편지는 언제, 어떤 파일로 받나요?</summary><p>기기 현지 시간으로 매주 월요일 오전 9시부터 지난주 기록을 한 편의 영상으로 만듭니다. 앱이 꺼져 있었다면 다음 실행 시 만들며 만드는 동안 창이 열려 있어야 합니다. 완성되면 앱에 “배달왔어요 🍅” 알림이 표시되고 WebM 파일로 다운로드할 수 있습니다. 기록이 없는 주에는 만들지 않습니다.</p></details>
+          <details id="data">
+            <summary>데이터는 어디에 저장되나요?</summary>
+            <p>
+              할 일과 집중 기록, 촬영 영상과 받은 영상 편지는 이 Mac에 저장됩니다. 서버로 업로드하거나 다른 기기에 자동 동기화하지 않습니다. 할 일과 집중 기록은 설정의 JSON 내보내기·가져오기로 옮길 수 있습니다.
+            </p>
+          </details>
+          <details>
+            <summary>업데이트 전에 기록을 백업할 수 있나요?</summary>
+            <p>
+              설정 → 데이터 내보내기에서 할 일과 집중 기록의 JSON 백업을 저장할 수 있습니다. 촬영 영상과 영상 편지는 JSON에 포함되지 않습니다. 받은 영상 편지는 집중 로그에서 따로 다운로드해 보관하세요.
+            </p>
+          </details>
+        </div>
+      </section>
+      <div class="download-back wrap">
+        <a class="text-link" href="about.html"
+          >기능 소개 보기 <span aria-hidden="true">↗</span></a
+        >
+      </div>
+    </main>
+    <footer class="site-footer wrap">
+      <a class="brand" href="index.html"
+        ><img src="assets/mascot.svg" width="32" height="32" alt="" /><span
+          >To3mato.</span
+        ></a
+      >
+      <div>
+        <a href="download.html">다운로드</a><span>© 2026 To3mato</span>
+      </div>
+    </footer>
+  </body>
+</html>

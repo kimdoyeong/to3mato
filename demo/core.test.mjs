@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {roundedPomodoros,elapsedSeconds,startTask,settleTimer} from './dist/core.mjs';
+test('0 / 0.5 / 1 boundaries round half up',()=>{for(const [elapsed,value] of [[0,0],[374,0],[375,.5],[750,.5],[1124,.5],[1125,1],[1500,1],[1700,1]])assert.equal(roundedPomodoros(elapsed,1500),value);});
+test('switch records A and starts a fresh full B timer',()=>{const s={records:[],timer:null};startTask(s,'A',1500,1000);const rec=startTask(s,'B',1500,751000);assert.equal(rec.taskId,'A');assert.equal(rec.pomodoros,.5);assert.equal(rec.seconds,750);assert.equal(s.timer.taskId,'B');assert.equal(elapsedSeconds(s.timer,751000),0);assert.equal(s.timer.duration,1500);});
+test('paused time is excluded and same task resumes without resetting',()=>{const s={records:[],timer:{taskId:'A',duration:1500,elapsed:500,running:false,phase:'focus',startedAt:0}};startTask(s,'A',1500,1000000);assert.equal(elapsedSeconds(s.timer,1001000),501);assert.equal(s.records.length,0);});
+test('completed record remains when an interrupted timer is recorded',()=>{const s={records:[{taskId:'A',pomodoros:1}],timer:null};startTask(s,'A',1500,0);settleTimer(s,400000);assert.equal(s.records.length,2);assert.equal(s.records[0].pomodoros,1);assert.equal(s.records[1].pomodoros,.5);assert.equal(s.timer,null);});
+test('rest never adds a focus record and settling is idempotent',()=>{const s={records:[],timer:{taskId:null,phase:'rest',duration:300,elapsed:0,running:true,startedAt:0}};settleTimer(s,50000);settleTimer(s,51000);assert.equal(s.records.length,0);});
+test('wall-clock resume clamps a completed timer to one pomodoro',()=>{const s={records:[],timer:null};startTask(s,'A',1500,0);const r=settleTimer(s,9000000);assert.equal(r.seconds,1500);assert.equal(r.pomodoros,1);});

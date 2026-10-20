@@ -1,0 +1,29 @@
+node_modules/
+/dist/
+/release/
+playwright-report/
+test-results/
+.DS_Store
+*.log
+supabase/.temp/
+supabase/.branches/
+
+# Generated website output and local QA captures
+/website/cloudflare-dist/
+/website/qa/
+/website/dist/downloads/*.dmg
+/website/dist/downloads/*.zip
+/website/dist/downloads/*.blockmap
+
+# Local credentials and environment configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+.wrangler/
+
+/demo/.openai/
