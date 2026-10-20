@@ -36,12 +36,14 @@
 | `APPLE_ID` | 공증에 사용할 Apple 계정 |
 | `APPLE_APP_SPECIFIC_PASSWORD` | 위 계정의 앱 전용 암호 |
 | `APPLE_TEAM_ID` | Developer ID 팀 ID. 기존 배포 팀은 `H2RM6XYB9D` |
-| `CLOUDFLARE_API_TOKEN` | `to3mato-downloads` 버킷의 R2 객체 쓰기 권한을 가진 API 토큰 |
+| `CLOUDFLARE_API_TOKEN` | 해당 계정의 `Workers R2 Storage: Edit` 권한을 가진 Cloudflare API 토큰. Wrangler는 REST API를 사용하므로 S3 전용 `Object Read & Write` 토큰은 사용할 수 없음 |
 | `CLOUDFLARE_ACCOUNT_ID` | 위 R2 버킷이 속한 Cloudflare 계정 ID |
 
 개인 키가 없는 인증서만으로는 서명할 수 없다. 기존 macOS 키체인 프로필과 로컬 Wrangler 로그인은 GitHub 러너로 자동 전달되지 않는다. Secrets가 없으면 서명 작업이 누락된 이름을 출력하고 중단한다. 로컬 개인 키와 로그인 토큰을 자동으로 추출하거나 업로드하지 않는다.
 
 로컬 파일을 Secrets로 등록할 때는 `gh secret set CSC_LINK`에 Base64 인코딩한 파일을 표준 입력으로 전달할 수 있다. 나머지는 `gh secret set <이름>`의 비공개 입력을 사용한다. `.p12`와 암호 파일을 Git에 추가하지 않는다.
+
+Apple 계정과 앱 전용 암호는 Mac의 터미널에서 `python3 scripts/register-apple-ci-secrets.py`로 등록할 수 있다. 두 입력은 화면에 표시하거나 파일에 저장하지 않으며, Apple 공증 서비스 인증을 확인한 뒤 해당 저장소의 Secrets에 등록한다. iCloud 키체인 항목이 화면 공유 제한으로 열리지 않으면 반복해서 인증을 요구하지 않고 이 입력 절차를 사용한다.
 
 ## 릴리스 절차
 
@@ -74,4 +76,6 @@
 
 - [GitHub Actions 검증 실행](https://github.com/kimdoyeong/to3mato/actions/runs/39359511757): 기본 검증, macOS UI 테스트, 서명 없는 패키징과 패키징 앱 테스트 성공. `main`, `deploy=false`로 실행했으므로 서명·공증과 R2 게시는 실행하지 않았다.
 - 로컬 `actionlint`, 타입 검사와 빌드 통과. 게시 도중 최신 피드가 바뀌는 경우와 동일 산출물 재시도까지 포함해 단위 테스트 76개 통과.
-- `APPLE_TEAM_ID`를 기존 배포 팀 값으로 등록했다. 나머지 Secrets 6개는 등록이 필요하다. 실제 서명·공증·R2 자동 배포는 해당 자격 증명 등록 후 새 버전에서 검증해야 한다.
+- 사용자의 요청으로 `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_TEAM_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`을 등록했다. 인증서는 해당 앱의 Developer ID Application 인증서와 개인 키만 선택해 암호화했고 임시 파일은 삭제했다.
+- `to3mato-github-release` Cloudflare 토큰을 해당 계정의 R2 편집 권한으로 발급했다. 토큰 활성 상태와 `to3mato-downloads` 버킷 접근을 확인했다.
+- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`는 iCloud 키체인의 화면 공유 제한 때문에 미등록 상태다. 위 비공개 입력 도구로 등록할 수 있다. 실제 서명·공증·R2 자동 배포는 해당 자격 증명 등록 후 새 버전에서 검증해야 한다.
