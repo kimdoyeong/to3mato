@@ -87,3 +87,10 @@ Apple 계정과 앱 전용 암호는 Mac의 터미널에서 `python3 scripts/reg
 - 공개 `latest-mac.yml`과 `release.json`이 `0.3.1`임을 확인했다. CI는 게시 파일의 공개 다운로드 해시를 검증했다.
 - 공개 주소에서 DMG를 다시 내려받아 SHA-256·크기를 대조했고, `codesign --verify`, `stapler validate`, Gatekeeper 검사에서 `Notarized Developer ID` 승인을 확인했다.
 - [macOS Apple Silicon 설치 파일](https://downloads.to3mato.doyeong.dev/To3mato-0.3.1-arm64.dmg). 앱과 업데이트 피드의 배포이며 다운로드 웹사이트는 이번에 재배포하지 않았다.
+
+## 로컬 설치본 업데이트 오류 복구 (2026-10-20)
+
+- `/Applications`의 기존 0.3.0 설치본은 `Contents/Resources/app-update.yml`이 없었다. 피드 조회는 성공했지만 다운로드 초기화에서 `ENOENT`가 발생했고 UI에는 일반 네트워크 오류가 표시됐다.
+- 공식 0.3.1 DMG에서 추출한 앱에는 해당 설정이 포함되어 있었다. 서명·공증을 검증한 공식 앱으로 교체하고 실제 설정 화면에서 업데이트 확인 성공을 확인했다.
+- 교체 전 앱과 데이터베이스를 로컬 `release/install-backup-20261020-031/`에 백업했다. 데이터베이스 마이그레이션 이후 기존 프로젝트·할 일·집중 기록 내용·설정·일시정지 타이머 값을 대조했고 보존됨을 확인했다. 기존 집중 기록 ID는 마이그레이션 규칙에 따라 변환됐다.
+- 사용자의 승인으로 집중 타이머를 일시정지하고 교체 후 남은 11분 37초부터 재개했다. 이 복구는 로컬 앱 교체이며 이미 게시된 0.3.1 파일은 변경하지 않았다.
