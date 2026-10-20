@@ -259,13 +259,21 @@ test('tray displays and popover share the desktop timer and close with the main 
       )
       .toBe(false);
     expect((await trayAction('snapshot')).visible).toBe(false);
+    const electronProcess = app.process();
     const closed = app.waitForEvent('close');
-    await app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()
-        .find((w) => !w.webContents.getURL().endsWith('/tray.html'))!
-        .close(),
-    );
+    await app
+      .evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => !w.webContents.getURL().endsWith('/tray.html'))!
+          .close(),
+      )
+      .catch((error) => {
+        // Closing the final window can terminate Electron before the RPC reply.
+        if (!error.message.includes('Execution context was destroyed'))
+          throw error;
+      });
     await closed;
+    await expect.poll(() => electronProcess.exitCode).toBe(0);
   } finally {
     await app.close().catch(() => {});
     await rm(directory, { recursive: true, force: true });
