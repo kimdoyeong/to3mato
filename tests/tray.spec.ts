@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-test('tray displays and popover share the desktop timer and close with the main window', async () => {
+test('tray shares the desktop timer, survives closing the main window, and quits explicitly', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'to3mato-tray-'));
   const env = { ...process.env, TO3MATO_USER_DATA: directory };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -261,16 +261,69 @@ test('tray displays and popover share the desktop timer and close with the main 
       )
       .toBe(false);
     expect((await trayAction('snapshot')).visible).toBe(false);
+    // Closing the main window keeps the timer and tray alive.
+    await page.evaluate(async () => {
+      await window.to3mato!.dispatch({
+        type: 'task:toggle',
+        payload: { id: 't1' },
+      });
+      await window.to3mato!.dispatch({
+        type: 'settings:save',
+        payload: { focus: 4, rest: 30 },
+      });
+      await window.to3mato!.dispatch({
+        type: 'timer:play',
+        payload: { id: 't1' },
+      });
+    });
+    const mainWindowAction = (action: string) =>
+      app.evaluate(({ BrowserWindow, app }, action) => {
+        const main = BrowserWindow.getAllWindows().find(
+          (w) => !w.webContents.getURL().endsWith('/tray.html'),
+        )!;
+        if (action === 'close') main.close();
+        if (action === 'activate') app.emit('activate');
+        if (action === 'second-instance')
+          app.emit('second-instance', {}, [], '', {});
+        return { visible: main.isVisible(), destroyed: main.isDestroyed() };
+      }, action);
+    expect(await mainWindowAction('close')).toEqual({
+      visible: false,
+      destroyed: false,
+    });
+    expect(app.process().exitCode).toBeNull();
+    await trayAction('click');
+    await expect(popover.locator('#tray-status')).toHaveText('집중 중');
+    const backgroundClock = await popover.locator('#tray-clock').innerText();
+    await expect
+      .poll(() => popover.locator('#tray-clock').innerText())
+      .not.toBe(backgroundClock);
+    await expect(popover.locator('#tray-status')).toHaveText('휴식 중');
+    await popover.locator('#tray-primary').click();
+    await expect(popover.locator('#tray-status')).toHaveText('휴식 대기');
+    await popover.getByRole('button', { name: 'To3mato 열기' }).click();
+    expect((await mainWindowAction('snapshot')).visible).toBe(true);
+    expect((await trayAction('snapshot')).visible).toBe(false);
+    await mainWindowAction('close');
+    await trayAction('open');
+    expect((await mainWindowAction('snapshot')).visible).toBe(true);
+    for (const action of ['activate', 'second-instance']) {
+      await mainWindowAction('close');
+      expect((await mainWindowAction(action)).visible).toBe(true);
+    }
+    await mainWindowAction('close');
     const electronProcess = app.process();
     const closed = app.waitForEvent('close');
     await app
-      .evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((w) => !w.webContents.getURL().endsWith('/tray.html'))!
-          .close(),
-      )
+      .evaluate(({ app }) => {
+        const load = process
+          .getBuiltinModule('module')
+          .createRequire(`${app.getAppPath()}/package.json`);
+        const { timerTray } = load('./electron/main.mjs');
+        timerTray.contextMenu.getMenuItemById('quit').click();
+      })
       .catch((error) => {
-        // Closing the final window can terminate Electron before the RPC reply.
+        // Quitting can terminate Electron before the RPC reply.
         if (!error.message.includes('Execution context was destroyed'))
           throw error;
       });

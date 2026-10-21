@@ -55,6 +55,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => {
     if (window) {
       if (window.isMinimized()) window.restore();
+      window.show();
       window.focus();
     }
   });
@@ -147,6 +148,11 @@ if (!app.requestSingleInstanceLock()) {
               details.mediaType === 'video',
           );
           window.once('ready-to-show', () => window.show());
+          window.on('close', (event) => {
+            if (quitting) return;
+            event.preventDefault();
+            window.hide();
+          });
           window.on('closed', () => {
             window = null;
             timerTray?.destroy();
@@ -161,6 +167,7 @@ if (!app.requestSingleInstanceLock()) {
           window.show();
           window.focus();
         };
+        app.on('activate', showMain);
         const trusted = (event, allowTray = false) => {
           const senderWindow =
             allowTray && event.sender === timerTray?.popover.webContents
