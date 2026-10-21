@@ -78,13 +78,14 @@ test('tray displays and popover share the desktop timer and close with the main 
       ];
       return {
         positions,
-        modes: ['bar', 'ring', 'hourglass'].map((mode) => {
+        modes: ['clock', 'bar', 'ring', 'hourglass'].map((mode) => {
           const image = createTrayImage(nativeImage, mode, {
             ratio: 0.5,
             phase: 'focus',
-            paused: false,
+            paused: true,
           });
           return {
+            mode,
             size: image.getSize(),
             scales: image.getScaleFactors(),
             empty: image.isEmpty(),
@@ -99,7 +100,8 @@ test('tray displays and popover share the desktop timer and close with the main 
     for (const image of images.modes) {
       expect(image.empty).toBe(false);
       expect(image.size.height).toBe(22);
-      expect(image.size.width).toBeGreaterThan(22);
+      if (image.mode === 'clock') expect(image.size.width).toBe(22);
+      else expect(image.size.width).toBeGreaterThan(22);
       expect(image.scales).toEqual([1, 2]);
     }
     await trayAction('click');

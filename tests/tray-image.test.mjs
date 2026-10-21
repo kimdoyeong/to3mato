@@ -60,6 +60,97 @@ for (const display of ['bar', 'ring', 'hourglass']) {
     );
   });
 }
+test('clock: running focus keeps the mascot, waiting and rest states are marked', () => {
+  const ink = [74, 49, 40, 255],
+    green = [79, 138, 58, 255],
+    white = [255, 255, 255, 255];
+  for (const scale of [1, 2]) {
+    const mascot = decodePNG(
+      readFileSync(
+        new URL(
+          `../electron/assets/mascot-tray${scale === 2 ? '@2x' : ''}.png`,
+          import.meta.url,
+        ),
+      ),
+    );
+    const render = (view) =>
+      decodePNG(renderTrayPNG('clock', { ratio: 0.5, ...view }, scale));
+    const at = (image, x, y) => [
+      ...image.pixels.subarray(
+        (y * scale * image.width + x * scale) * 4,
+        (y * scale * image.width + x * scale) * 4 + 4,
+      ),
+    ];
+    const focus = render({ phase: 'focus', paused: false });
+    assert.equal(focus.width, 22 * scale);
+    assert.equal(focus.height, 22 * scale);
+    assert.deepEqual(focus.pixels, mascot.pixels);
+
+    // Idle: desaturated and faded, no badge.
+    const idle = render({ phase: 'idle', paused: false });
+    let alpha = 0;
+    for (let i = 0; i < idle.pixels.length; i += 4) {
+      assert.equal(idle.pixels[i], idle.pixels[i + 1]);
+      assert.equal(idle.pixels[i + 1], idle.pixels[i + 2]);
+      assert.ok(idle.pixels[i + 3] <= mascot.pixels[i + 3]);
+      alpha += idle.pixels[i + 3];
+    }
+    assert.ok(
+      alpha <
+        mascot.pixels.reduce((sum, v, i) => sum + (i % 4 === 3 ? v : 0), 0) *
+          0.7,
+    );
+    assert.notDeepEqual(at(idle, 15, 12), ink);
+
+    // Paused focus: desaturated at full alpha with an ink badge and two bars.
+    const paused = render({ phase: 'focus', paused: true });
+    // Outside the badge the mascot is gray but keeps its alpha.
+    for (let y = 0; y < 10 * scale; y++)
+      for (let x = 0; x < 22 * scale; x++) {
+        const i = (y * paused.width + x) * 4;
+        assert.equal(paused.pixels[i], paused.pixels[i + 1]);
+        assert.equal(paused.pixels[i + 1], paused.pixels[i + 2]);
+        assert.equal(paused.pixels[i + 3], mascot.pixels[i + 3]);
+      }
+    assert.deepEqual(at(paused, 15, 12), ink);
+    assert.deepEqual(at(paused, 14, 16), white);
+    assert.deepEqual(at(paused, 16, 21), white);
+
+    // Rest: colored mascot with a green badge; the glyph is a cup while running
+    // and bars when paused.
+    const rest = render({ phase: 'rest', paused: false });
+    assert.deepEqual(at(rest, 3, 10), at(mascot, 3, 10));
+    assert.deepEqual(at(rest, 15, 12), green);
+    assert.deepEqual(at(rest, 14, 16), white);
+    assert.deepEqual(at(rest, 16, 21), white);
+    const restPaused = render({ phase: 'rest', paused: true });
+    assert.deepEqual(at(restPaused, 15, 12), green);
+    assert.deepEqual(at(restPaused, 14, 16), white);
+    assert.notDeepEqual(restPaused.pixels, rest.pixels);
+    assert.notDeepEqual(at(restPaused, 3, 10), at(mascot, 3, 10));
+
+    // Shape displays carry the same badge.
+    for (const display of ['bar', 'ring', 'hourglass']) {
+      const image = decodePNG(
+        renderTrayPNG(
+          display,
+          { phase: 'rest', paused: false, ratio: 0.5 },
+          scale,
+        ),
+      );
+      assert.deepEqual(at(image, 15, 12), green);
+    }
+  }
+  assert.equal(ratioBucket('clock', 0.9), 0);
+  assert.equal(
+    trayImageKey('clock', { ratio: 0.1, phase: 'focus', paused: false }),
+    trayImageKey('clock', { ratio: 0.9, phase: 'focus', paused: false }),
+  );
+  assert.notEqual(
+    trayImageKey('clock', { ratio: 0.1, phase: 'focus', paused: false }),
+    trayImageKey('clock', { ratio: 0.1, phase: 'focus', paused: true }),
+  );
+});
 test('shared tray state uses timer duration, task and current day', () => {
   let state = createInitialState();
   let view = timerMenuState(state);

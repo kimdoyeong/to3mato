@@ -116,13 +116,9 @@ export function createTimerTray({ getState, onError, showMain, dev }) {
           fontType: 'monospacedDigit',
         });
     }
-    const key = display === 'clock' ? 'clock' : trayImageKey(display, view);
+    const key = trayImageKey(display, view);
     if (key !== previousImage) {
-      tray.setImage(
-        display === 'clock'
-          ? icon
-          : createTrayImage(nativeImage, display, view),
-      );
+      tray.setImage(createTrayImage(nativeImage, display, view));
       previousImage = key;
     }
   };

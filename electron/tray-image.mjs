@@ -11,9 +11,11 @@ const color = (name) =>
     .match(/../g)
     .map((v) => parseInt(v, 16));
 const focusColor = color('red'),
-  restColor = color('green');
-const widths = { bar: 74, ring: 46, hourglass: 44 };
-const steps = { bar: 48, ring: 48, hourglass: 32 };
+  restColor = color('green'),
+  inkColor = color('ink');
+const widths = { clock: 22, bar: 74, ring: 46, hourglass: 44 };
+// The clock display shows no shape, so its image only changes with the timer state.
+const steps = { clock: 0, bar: 48, ring: 48, hourglass: 32 };
 export const ratioBucket = (display, ratio) =>
   Math.round(Math.max(0, Math.min(1, ratio || 0)) * (steps[display] ?? 1));
 export const trayImageKey = (display, view) =>
@@ -125,6 +127,75 @@ export function renderTrayPNG(display, view, scale = 1) {
       y * mascot.width * 4,
       (y + 1) * mascot.width * 4,
     );
+  const running = view.phase !== 'idle' && !view.paused;
+  // A stopped timer desaturates the mascot so it differs from a running one at
+  // a glance. Without a timer it is also faded; paused keeps full alpha and a badge.
+  if (!running)
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < mascot.width; x++) {
+        const offset = (y * width + x) * 4;
+        const gray = Math.round(
+          0.299 * pixels[offset] +
+            0.587 * pixels[offset + 1] +
+            0.114 * pixels[offset + 2],
+        );
+        pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = gray;
+        if (!view.paused)
+          pixels[offset + 3] = Math.round(pixels[offset + 3] * 0.65);
+      }
+  // Supersamples `sample` (in 22pt coordinates) and blends it over the pixels.
+  const paint = (x0, x1, y0, y1, sample) => {
+    for (let py = y0 * scale; py < y1 * scale; py++)
+      for (let px = x0 * scale; px < x1 * scale; px++) {
+        const sums = [0, 0, 0, 0];
+        for (let sy = 0; sy < 4; sy++)
+          for (let sx = 0; sx < 4; sx++) {
+            const c = sample(
+              (px + (sx + 0.5) / 4) / scale,
+              (py + (sy + 0.5) / 4) / scale,
+            );
+            if (!c) continue;
+            for (let i = 0; i < 3; i++) sums[i] += c[i] * c[3];
+            sums[3] += c[3];
+          }
+        const alpha = sums[3] / 16;
+        if (!alpha) continue;
+        const offset = (py * width + px) * 4,
+          under = (pixels[offset + 3] / 255) * (1 - alpha),
+          total = alpha + under;
+        for (let i = 0; i < 3; i++)
+          pixels[offset + i] = Math.round(
+            (sums[i] / 16 + pixels[offset + i] * under) / total,
+          );
+        pixels[offset + 3] = Math.round(total * 255);
+      }
+  };
+  // Badge over the mascot's lower-right corner for every state other than a
+  // running focus timer: the disc takes the phase color (ink for focus, the
+  // rest green for rest), a white edge keeps it visible on dark and light menu
+  // bars, and the glyph is two bars when paused or a cup while resting.
+  if (view.paused || view.phase === 'rest') {
+    const disc = view.phase === 'rest' ? restColor : inkColor;
+    const bars = (x, y) =>
+      (Math.abs(x - 14.25) <= 0.75 || Math.abs(x - 17.75) <= 0.75) &&
+      Math.abs(y - 16) <= 2.8;
+    const cup = (x, y) =>
+      (x >= 13.2 &&
+        x <= 17 &&
+        y >= 13.8 &&
+        y <= 18.3 &&
+        (y <= 16.6 || Math.hypot(x - 15.1, y - 16.6) <= 1.9)) ||
+      (x > 17 && Math.abs(Math.hypot(x - 17.4, y - 15.9) - 1.45) <= 0.45);
+    paint(10, 22, 10, 22, (x, y) => {
+      const distance = Math.hypot(x - 16, y - 16);
+      if (distance > 6) return null;
+      if (distance > 5) return [255, 255, 255, 1];
+      return (view.paused ? bars : cup)(x, y)
+        ? [255, 255, 255, 1]
+        : [...disc, 1];
+    });
+  }
+  if (display === 'clock') return encodePNG(width, height, pixels);
   const ratio = ratioBucket(display, view.ratio) / steps[display];
   const rgb = view.phase === 'rest' ? restColor : focusColor;
   const active = view.phase !== 'idle',
@@ -164,26 +235,9 @@ export function renderTrayPNG(display, view, scale = 1) {
       return display === 'ring'
         ? [185, 170, 153, 0.7 * opacity]
         : [130, 112, 98, opacity];
-    return [0, 0, 0, 0];
+    return null;
   };
-  for (let py = 0; py < height; py++)
-    for (let px = 24 * scale; px < width; px++) {
-      const sums = [0, 0, 0, 0];
-      for (let sy = 0; sy < 4; sy++)
-        for (let sx = 0; sx < 4; sx++) {
-          const c = sample(
-            (px + (sx + 0.5) / 4) / scale,
-            (py + (sy + 0.5) / 4) / scale,
-          );
-          for (let i = 0; i < 3; i++) sums[i] += c[i] * c[3];
-          sums[3] += c[3];
-        }
-      const offset = (py * width + px) * 4;
-      if (sums[3])
-        for (let i = 0; i < 3; i++)
-          pixels[offset + i] = Math.round(sums[i] / sums[3]);
-      pixels[offset + 3] = Math.round((sums[3] / 16) * 255);
-    }
+  paint(24, widths[display], 0, 22, sample);
   return encodePNG(width, height, pixels);
 }
 export function createTrayImage(nativeImage, display, view) {
