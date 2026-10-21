@@ -75,6 +75,7 @@ try {
   await page.evaluate(() => document.fonts.ready);
   const shot = async (name, locator = page) => {
     await page.mouse.move(0, 0);
+    await page.locator('.toast.visible').waitFor({ state: 'hidden' });
     await page.evaluate(() =>
       document.getAnimations().forEach((a) => {
         if (Number.isFinite(a.effect.getComputedTiming().endTime)) a.finish();
@@ -90,13 +91,24 @@ try {
   await page.evaluate(() => window.to3mato.dispatch({ type: 'timer:toggle' }));
   await shot('app-today');
   await page.getByRole('button', { name: '프로젝트', exact: true }).click();
-  await page.locator('.project-card').filter({ hasText: '개인 웹사이트' }).click();
+  await page
+    .locator('.project-card')
+    .filter({ hasText: '개인 웹사이트' })
+    .click();
   await shot('app-project');
   await page.getByRole('button', { name: '캘린더', exact: true }).click();
   await shot('app-calendar');
   await page.getByRole('button', { name: '프로젝트', exact: true }).click();
-  if (await page.locator('.project-card').filter({ hasText: '개인 웹사이트' }).count())
-    await page.locator('.project-card').filter({ hasText: '개인 웹사이트' }).click();
+  if (
+    await page
+      .locator('.project-card')
+      .filter({ hasText: '개인 웹사이트' })
+      .count()
+  )
+    await page
+      .locator('.project-card')
+      .filter({ hasText: '개인 웹사이트' })
+      .click();
   await page.getByRole('button', { name: '할 일 추가', exact: true }).click();
   await page.getByRole('button', { name: '여러 개 추가', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '여러 할 일 추가' });
