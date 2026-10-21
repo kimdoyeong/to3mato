@@ -4,15 +4,15 @@
 
 ## 실행 조건
 
-| 이벤트 | 동작 |
-| --- | --- |
-| `release/<버전>` 푸시 | 검증 → macOS UI 테스트·패키징 → 서명·공증 → R2 배포 → 웹사이트 갱신·공개 검증 |
-| `release/*`에서 `main`으로 보내는 PR 또는 `release/*` 대상 PR | 검증과 테스트만 실행. Secrets를 사용하지 않음 |
-| Actions 수동 실행, `deploy=false` | 선택한 브랜치의 검증과 테스트만 실행 |
-| Actions 수동 실행, `deploy=true` | `release/<버전>` 브랜치에서만 배포 |
-| `main` 푸시 | 자동 실행 없음 |
+| 이벤트                                                        | 동작                                                                          |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `release/<버전>` 푸시                                         | 검증 → macOS UI 테스트·패키징 → 서명·공증 → R2 배포 → 웹사이트 갱신·공개 검증 |
+| `release/*`에서 `main`으로 보내는 PR 또는 `release/*` 대상 PR | 검증과 테스트만 실행. Secrets를 사용하지 않음                                 |
+| Actions 수동 실행, `deploy=false`                             | 선택한 브랜치의 검증과 테스트만 실행                                          |
+| Actions 수동 실행, `deploy=true`                              | `release/<버전>` 브랜치에서만 배포                                            |
+| `main` 푸시                                                   | 자동 실행 없음                                                                |
 
-브랜치명은 `package.json`과 `package-lock.json`의 버전과 일치해야 한다. 예를 들어 버전이 `0.3.2`이면 `release/0.3.2`를 사용한다. 사전 공개 버전은 배포하지 않는다. 현재 정식 배포는 `0.3.3`이므로 다음 배포에는 새 버전이 필요하다.
+브랜치명은 `package.json`과 `package-lock.json`의 버전과 일치해야 한다. 예를 들어 버전이 `0.3.2`이면 `release/0.3.2`를 사용한다. 사전 공개 버전은 배포하지 않는다. 현재 정식 배포는 `0.3.4`이므로 다음 배포에는 새 버전이 필요하다.
 
 ## 작업 구성
 
@@ -29,15 +29,15 @@
 
 [저장소의 Actions Secrets 설정](https://github.com/kimdoyeong/to3mato/settings/secrets/actions)에 다음 7개를 등록한다. 값은 채팅이나 저장소 파일에 넣지 않는다.
 
-| 이름 | 값 |
-| --- | --- |
-| `CSC_LINK` | Developer ID Application 인증서와 개인 키를 포함한 암호화된 `.p12` 파일의 Base64 문자열 |
-| `CSC_KEY_PASSWORD` | 위 `.p12`의 내보내기 암호 |
-| `APPLE_ID` | 공증에 사용할 Apple 계정 |
-| `APPLE_APP_SPECIFIC_PASSWORD` | 위 계정의 앱 전용 암호 |
-| `APPLE_TEAM_ID` | Developer ID 팀 ID. 기존 배포 팀은 `H2RM6XYB9D` |
-| `CLOUDFLARE_API_TOKEN` | 해당 계정의 `Workers R2 Storage: Edit` 및 `Cloudflare Pages: Edit` 권한을 가진 Cloudflare API 토큰. Wrangler는 REST API를 사용하므로 S3 전용 `Object Read & Write` 토큰은 사용할 수 없음 |
-| `CLOUDFLARE_ACCOUNT_ID` | 위 R2 버킷이 속한 Cloudflare 계정 ID |
+| 이름                          | 값                                                                                                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CSC_LINK`                    | Developer ID Application 인증서와 개인 키를 포함한 암호화된 `.p12` 파일의 Base64 문자열                                                                                                  |
+| `CSC_KEY_PASSWORD`            | 위 `.p12`의 내보내기 암호                                                                                                                                                                |
+| `APPLE_ID`                    | 공증에 사용할 Apple 계정                                                                                                                                                                 |
+| `APPLE_APP_SPECIFIC_PASSWORD` | 위 계정의 앱 전용 암호                                                                                                                                                                   |
+| `APPLE_TEAM_ID`               | Developer ID 팀 ID. 기존 배포 팀은 `H2RM6XYB9D`                                                                                                                                          |
+| `CLOUDFLARE_API_TOKEN`        | 해당 계정의 `Workers R2 Storage: Edit` 및 `Cloudflare Pages: Edit` 권한을 가진 Cloudflare API 토큰. Wrangler는 REST API를 사용하므로 S3 전용 `Object Read & Write` 토큰은 사용할 수 없음 |
+| `CLOUDFLARE_ACCOUNT_ID`       | 위 R2 버킷이 속한 Cloudflare 계정 ID                                                                                                                                                     |
 
 개인 키가 없는 인증서만으로는 서명할 수 없다. 기존 macOS 키체인 프로필과 로컬 Wrangler 로그인은 GitHub 러너로 자동 전달되지 않는다. Secrets가 없으면 서명 작업이 누락된 이름을 출력하고 중단한다. 로컬 개인 키와 로그인 토큰을 자동으로 추출하거나 업로드하지 않는다.
 
@@ -96,7 +96,6 @@ Apple 계정과 앱 전용 암호는 Mac의 터미널에서 `python3 scripts/reg
 - 교체 전 앱과 데이터베이스를 로컬 `release/install-backup-20261020-031/`에 백업했다. 데이터베이스 마이그레이션 이후 기존 프로젝트·할 일·집중 기록 내용·설정·일시정지 타이머 값을 대조했고 보존됨을 확인했다. 기존 집중 기록 ID는 마이그레이션 규칙에 따라 변환됐다.
 - 사용자의 승인으로 집중 타이머를 일시정지하고 교체 후 남은 11분 37초부터 재개했다. 이 복구는 로컬 앱 교체이며 이미 게시된 0.3.1 파일은 변경하지 않았다.
 
-
 ## 0.3.2 릴리스 및 웹사이트 자동 갱신 (2026-10-20)
 
 - 브랜치 `release/0.3.2`, 커밋 `7f42223967da0bb994e0eb4289625e00fb7f4954`, 태그 `v0.3.2`.
@@ -119,3 +118,15 @@ Apple 계정과 앱 전용 암호는 Mac의 터미널에서 `python3 scripts/reg
 - 캐시 우회 없는 요청으로 공개 업데이트 피드, R2·사이트의 `release.json`과 체크섬, [다운로드 페이지](https://to3mato.doyeong.dev/download)가 모두 0.3.3 산출물과 일치함을 확인했다.
 - 설치 파일은 `To3mato-0.3.3-arm64.dmg`, 크기는 145,364,532바이트(표시 138.6 MB), SHA-256은 `aadeb818cac0750cf6f8af95170f7905089c999ade2bb37d3870f7ba56b7d384`다.
 - 설치된 사용자 앱은 종료하거나 교체하지 않았다. 이번 변경은 0.3.3 업데이트 적용 후 사용할 수 있다.
+
+## 0.3.4 릴리스 (2026-10-21)
+
+- 브랜치 `release/0.3.4`, 커밋 `74d094cc7ded6632da6da8855ea231e04d4c612e`, 태그 `v0.3.4`.
+- 트레이 아이콘이 집중 대기·일시정지·휴식 중·휴식 대기를 구분해 표시한다. 대기와 일시정지는 마스코트를 흑백으로 바꾸고, 일시정지와 휴식은 단계 색 배지를 붙인다. 네 가지 표시 방식에 모두 적용된다.
+- [첫 실행](https://github.com/kimdoyeong/to3mato/actions/runs/39525884259)은 커밋 `243c9b5`에서 Validate와 macOS tests and package를 통과했지만 Sign and notarize의 최종 검증에서 ZIP에서 추출한 앱의 `stapler validate`가 실패했다. 앱·DMG 공증 자체는 성공했고, 스크립트가 stapler의 stdout을 출력하지 않아 사유가 남지 않았다. 게시 단계는 실행되지 않았다.
+- `scripts/notarize-mac.mjs`가 실패한 명령의 stdout·stderr를 함께 출력하고 온라인 티켓 조회인 `stapler validate`만 최대 3회 재시도하도록 수정했다. 티켓이 없는 번들은 여전히 실패한다.
+- [릴리스 실행](https://github.com/kimdoyeong/to3mato/actions/runs/39526857154)의 Validate, macOS tests and package, Sign and notarize가 성공했다. 재시도 경고 없이 첫 검증에서 통과했다. 단위 테스트 82개를 통과했다.
+- 첫 시도의 Publish app and website는 DMG를 R2에 올리는 도중 Cloudflare API가 502를 반환해 실패했다. 같은 실행의 Re-run failed jobs로 Publish 작업만 재실행했고, 서명 작업의 동일 산출물 `signed-release-39526857154`를 내려받아 두 번째 시도에서 성공했다.
+- 캐시 우회 없는 요청으로 공개 업데이트 피드, R2·사이트의 `release.json`과 `SHA256SUMS.txt`, [다운로드 페이지](https://to3mato.doyeong.dev/download)의 버전·링크·용량이 모두 0.3.4 산출물과 일치함을 확인했다.
+- 설치 파일은 `To3mato-0.3.4-arm64.dmg`, 크기는 145,362,806바이트(표시 138.6 MB), SHA-256은 `1fb5a4e580adb1b81f361041e514b1e7069e1e0cf8430ec29f41187a4518b06d`다.
+- 설치된 사용자 앱은 종료하거나 교체하지 않았다. 이번 변경은 0.3.4 업데이트 적용 후 사용할 수 있다.
