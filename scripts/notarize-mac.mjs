@@ -46,6 +46,29 @@ const save = (receipt) => {
   fs.renameSync(`${receiptPath}.tmp`, receiptPath);
 };
 
+const outputOf = (error) =>
+  [error.stdout, error.stderr]
+    .map((value) => value?.toString().trim())
+    .filter(Boolean)
+    .join('\n');
+const sleep = (ms) =>
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+// Ticket validation is an online lookup and can fail transiently right after
+// notarization. Retry a few times; a bundle without a ticket still fails.
+const validateStaple = (target) => {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return run('xcrun', ['stapler', 'validate', target]);
+    } catch (error) {
+      if (attempt >= 3) throw error;
+      console.warn(
+        `stapler validate 실패 (${attempt}/3), ${5 * attempt}초 후 재시도: ${outputOf(error) || error.message}`,
+      );
+      sleep(5000 * attempt);
+    }
+  }
+};
+
 const validateApp = (appPath) => {
   run('codesign', [
     '--verify',
@@ -54,7 +77,7 @@ const validateApp = (appPath) => {
     '-R=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists',
     appPath,
   ]);
-  run('xcrun', ['stapler', 'validate', appPath]);
+  validateStaple(appPath);
   run('spctl', ['--assess', '--type', 'execute', appPath]);
   const appVersion = run('/usr/libexec/PlistBuddy', [
     '-c',
@@ -146,7 +169,7 @@ try {
     // Persist the new hash immediately so a later validation retry never reuploads.
     receipt.stapledSha256 = hash();
     save(receipt);
-    console.log(run('xcrun', ['stapler', 'validate', dmg]).trim());
+    console.log(validateStaple(dmg).trim());
     run('codesign', ['--verify', '--strict', dmg]);
     run('spctl', [
       '--assess',
@@ -174,6 +197,7 @@ try {
     );
   }
 } catch (error) {
-  console.error(error.stderr?.toString().trim() || error.message);
+  const detail = outputOf(error);
+  console.error(detail ? `${error.message}\n${detail}` : error.message);
   process.exitCode = 1;
 }
