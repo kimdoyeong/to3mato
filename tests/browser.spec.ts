@@ -51,6 +51,9 @@ test('browser imports demo data and preserves edits and date moves', async () =>
     ).toContainText('수정한 작업');
 
     await page.getByRole('button', { name: '캘린더', exact: true }).click();
+    // On Sunday, tomorrow is outside the initially displayed week.
+    if (new Date(offsetDate(1) + 'T12:00:00').getDay() === 1)
+      await page.getByRole('button', { name: '다음 주', exact: true }).click();
     const calendarDate = new Date(
       offsetDate(1) + 'T12:00:00',
     ).toLocaleDateString('ko-KR', {
