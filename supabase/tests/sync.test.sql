@@ -1,0 +1,13 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(8);
+select ok(not has_table_privilege('authenticated','public.tasks','INSERT'),'clients cannot bypass RPC');
+select ok(not has_table_privilege('anon','public.tasks','SELECT'),'anonymous reads denied');
+select ok(has_function_privilege('authenticated','public.sync_push(jsonb,text)','EXECUTE'),'authenticated RPC enabled');
+select ok(not has_function_privilege('anon','public.sync_push(jsonb,text)','EXECUTE'),'anonymous RPC denied');
+select ok(not has_schema_privilege('authenticated','sync_private','USAGE'),'internal helpers hidden');
+select is((select public from storage.buckets where id='to3mato'),false,'private media bucket');
+select is((select count(*)::integer from pg_policies where schemaname='public' and policyname='own_read'),15,'all account tables have owner RLS');
+select is((select count(*)::integer from pg_policies where schemaname='realtime' and policyname='account_broadcast_read'),1,'account broadcast authorization installed');
+select * from finish();
+rollback;
