@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
+  import Tomato from './Tomato.svelte';
   import Icon from './Icon.svelte';
-  import { send, notify } from '../lib/client';
+  import { state as appState, send, notify } from '../lib/client';
   let {
     date,
     label,
@@ -8,6 +10,16 @@
   }: { date: string; label: string; project?: string } = $props();
   let title = $state(''),
     busy = $state(false);
+  const openTemplate =
+    getContext<(project: string, date: string) => void>('open-template');
+  let templatesOpen = $state(false);
+  async function apply(id: string) {
+    if (busy) return;
+    busy = true;
+    if (await send('template:apply', { id, date, project }))
+      templatesOpen = false;
+    busy = false;
+  }
   let input: HTMLInputElement;
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -45,7 +57,14 @@
     autocomplete="off"
     disabled={busy}
   />
-  <button type="button" class="btn-line" disabled>템플릿</button>
+  <button
+    type="button"
+    class="btn-line"
+    class:pressed={templatesOpen}
+    aria-expanded={templatesOpen}
+    disabled={busy}
+    onclick={() => (templatesOpen = !templatesOpen)}>템플릿</button
+  >
   <button
     type="submit"
     class="btn-line"
@@ -53,3 +72,45 @@
     aria-label={`${label} 할 일 추가`}>할 일 추가</button
   >
 </form>
+
+{#if templatesOpen}
+  <div
+    class="paper alt tilt-a quick-templates"
+    role="group"
+    aria-label="템플릿"
+  >
+    <span class="tape r" aria-hidden="true"></span>
+    {#each $appState.templates as item (item.id)}
+      <button
+        type="button"
+        class="quick-template"
+        disabled={busy}
+        onclick={() => apply(item.id)}
+      >
+        <strong>{item.name}</strong>
+        <span class="template-chips"
+          >{#each item.steps as step}<span class="chip"
+              >{step.title.replaceAll('%n%', '1')}<span class="pomo-count"
+                >{step.estimate}<Tomato filled /></span
+              ></span
+            >{/each}</span
+        >
+        <span class="muted pomo-count"
+          >예상 합계 {item.steps.reduce(
+            (sum, step) => sum + step.estimate,
+            0,
+          )}<Tomato filled /></span
+        >
+      </button>
+    {/each}
+    <button
+      type="button"
+      class="btn-dash"
+      disabled={busy}
+      onclick={() => {
+        templatesOpen = false;
+        openTemplate(project, date);
+      }}>템플릿 추가</button
+    >
+  </div>
+{/if}

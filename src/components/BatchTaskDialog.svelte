@@ -7,9 +7,12 @@
     renderTaskTemplate,
     MAX_BATCH_SIZE,
   } from '../lib/batch.mjs';
+  import TemplateBatch from './TemplateBatch.svelte';
   import TemplateInput from './TemplateInput.svelte';
   let { onsingle }: { onsingle: (project: string) => void } = $props();
   let dialog: HTMLDialogElement;
+  let mode = $state<'batch' | 'template'>('batch');
+  let templateDate = $state('');
   let project = $state(''),
     template = $state(''),
     count = $state<number | undefined>(10),
@@ -33,7 +36,13 @@
     { id: 6, name: '토' },
     { id: 0, name: '일' },
   ];
-  export async function open(id: string) {
+  export async function open(
+    id: string,
+    nextMode: 'batch' | 'template' = 'batch',
+    date = '',
+  ) {
+    mode = nextMode;
+    templateDate = date;
     project = id;
     template = '';
     count = 10;
@@ -48,7 +57,11 @@
     busy = false;
     await tick();
     dialog.showModal();
-    dialog.querySelector<HTMLInputElement>('#batch-template')?.focus();
+    dialog
+      .querySelector<HTMLInputElement>(
+        mode === 'template' ? '.template-form input' : '#batch-template',
+      )
+      ?.focus();
   }
   async function generate(event: SubmitEvent) {
     event.preventDefault();
@@ -122,7 +135,7 @@
       aria-label="닫기">✕</button
     >
   </div>
-  {#if step === 'setup'}
+  {#if step === 'setup' || mode === 'template'}
     <div class="add-mode">
       <button
         type="button"
@@ -130,96 +143,116 @@
           dialog.close();
           onsingle(project);
         }}>하나 추가</button
-      ><button type="button" class="selected" aria-pressed="true"
-        >여러 개 추가</button
+      ><button
+        type="button"
+        class:selected={mode === 'batch'}
+        aria-pressed={mode === 'batch'}
+        disabled={busy}
+        onclick={() => (mode = 'batch')}>여러 개 추가</button
+      >
+      <button
+        type="button"
+        class:selected={mode === 'template'}
+        aria-pressed={mode === 'template'}
+        disabled={busy}
+        onclick={() => (mode = 'template')}>템플릿</button
       >
     </div>
-    <form onsubmit={generate} class="batch-form">
-      <div class="batch-scroll">
-        <TemplateInput bind:value={template} />
-        <div class="form-grid">
-          <label
-            >생성 개수<input
-              type="number"
-              min="1"
-              max={MAX_BATCH_SIZE}
-              step="1"
-              required
-              bind:value={count}
-            /></label
-          ><label
-            >공통 예상 포모도로<input
-              type="number"
-              min="1"
-              max={MAX_TASK_ESTIMATE}
-              step="1"
-              required
-              bind:value={estimate}
-            /></label
+    {#if mode === 'template'}
+      <TemplateBatch
+        bind:project
+        date={templateDate}
+        onclose={() => dialog.close()}
+        onbusy={(value) => (busy = value)}
+      />
+    {:else}
+      <form onsubmit={generate} class="batch-form">
+        <div class="batch-scroll">
+          <TemplateInput bind:value={template} />
+          <div class="form-grid">
+            <label
+              >생성 개수<input
+                type="number"
+                min="1"
+                max={MAX_BATCH_SIZE}
+                step="1"
+                required
+                bind:value={count}
+              /></label
+            ><label
+              >공통 예상 포모도로<input
+                type="number"
+                min="1"
+                max={MAX_TASK_ESTIMATE}
+                step="1"
+                required
+                bind:value={estimate}
+              /></label
+            >
+          </div>
+          <div class="form-grid">
+            <label
+              >시작 날짜<input
+                type="date"
+                required
+                bind:value={startDate}
+              /></label
+            ><label
+              >하루 기본 개수<input
+                type="number"
+                min="1"
+                max={MAX_BATCH_SIZE}
+                step="1"
+                required
+                bind:value={perDay}
+              /></label
+            >
+          </div>
+          <fieldset class="weekday-field">
+            <legend>배치할 요일</legend>
+            <div class="weekday-picker">
+              {#each days as day}<button
+                  type="button"
+                  class:selected={weekdays.includes(day.id)}
+                  aria-pressed={weekdays.includes(day.id)}
+                  aria-label={`${day.name}요일 배치`}
+                  onclick={() => {
+                    weekdays = weekdays.includes(day.id)
+                      ? weekdays.filter((id) => id !== day.id)
+                      : [...weekdays, day.id];
+                  }}>{day.name}</button
+                >{/each}
+            </div>
+          </fieldset>
+          <fieldset class="weekday-field">
+            <legend>요일별 개수 예외</legend>
+            <p class="batch-help">비워두면 하루 기본 개수를 적용합니다.</p>
+            <div class="weekday-overrides">
+              {#each days.filter( (day) => weekdays.includes(day.id) ) as day}<label
+                  >{day.name}요일<input
+                    type="number"
+                    min="1"
+                    max={MAX_BATCH_SIZE}
+                    step="1"
+                    placeholder={String(perDay ?? '')}
+                    bind:value={overrides[day.id]}
+                  /></label
+                >{/each}
+            </div>
+          </fieldset>
+          {#if drafts.length}<p class="batch-help">
+              목록을 다시 생성하면 개별 수정한 내용이 초기화됩니다.
+            </p>{/if}
+          {#if error}<p class="batch-error" role="alert">{error}</p>{/if}
+        </div>
+        <div class="dialog-footer">
+          <span class="batch-help">1번부터 생성 · 최대 {MAX_BATCH_SIZE}개</span
+          ><button type="submit" class="primary"
+            >{drafts.length ? '목록 다시 생성' : '목록 생성'}</button
           >
         </div>
-        <div class="form-grid">
-          <label
-            >시작 날짜<input
-              type="date"
-              required
-              bind:value={startDate}
-            /></label
-          ><label
-            >하루 기본 개수<input
-              type="number"
-              min="1"
-              max={MAX_BATCH_SIZE}
-              step="1"
-              required
-              bind:value={perDay}
-            /></label
-          >
-        </div>
-        <fieldset class="weekday-field">
-          <legend>배치할 요일</legend>
-          <div class="weekday-picker">
-            {#each days as day}<button
-                type="button"
-                class:selected={weekdays.includes(day.id)}
-                aria-pressed={weekdays.includes(day.id)}
-                aria-label={`${day.name}요일 배치`}
-                onclick={() => {
-                  weekdays = weekdays.includes(day.id)
-                    ? weekdays.filter((id) => id !== day.id)
-                    : [...weekdays, day.id];
-                }}>{day.name}</button
-              >{/each}
-          </div>
-        </fieldset>
-        <fieldset class="weekday-field">
-          <legend>요일별 개수 예외</legend>
-          <p class="batch-help">비워두면 하루 기본 개수를 적용합니다.</p>
-          <div class="weekday-overrides">
-            {#each days.filter((day) => weekdays.includes(day.id)) as day}<label
-                >{day.name}요일<input
-                  type="number"
-                  min="1"
-                  max={MAX_BATCH_SIZE}
-                  step="1"
-                  placeholder={String(perDay ?? '')}
-                  bind:value={overrides[day.id]}
-                /></label
-              >{/each}
-          </div>
-        </fieldset>
-        {#if drafts.length}<p class="batch-help">
-            목록을 다시 생성하면 개별 수정한 내용이 초기화됩니다.
-          </p>{/if}
-        {#if error}<p class="batch-error" role="alert">{error}</p>{/if}
-      </div>
-      <div class="dialog-footer">
-        <span class="batch-help">1번부터 생성 · 최대 {MAX_BATCH_SIZE}개</span
-        ><button type="submit" class="primary"
-          >{drafts.length ? '목록 다시 생성' : '목록 생성'}</button
-        >
-      </div>
-    </form>
+      </form>
+    {/if}
   {:else}
     <form onsubmit={save} class="batch-form">
       <p class="batch-help">

@@ -8,6 +8,8 @@
   import Tomato from './Tomato.svelte';
   import TaskList from './TaskList.svelte';
   import QuickAdd from './QuickAdd.svelte';
+  import TicketTemplateDialog from './TicketTemplateDialog.svelte';
+  let templateDialog: { open: () => Promise<void> };
   import Ticket from './Ticket.svelte';
   import ProjectCover from './ProjectCover.svelte';
   import HandBar from './parts/HandBar.svelte';
@@ -159,6 +161,13 @@
 </section>
 
 <section class="diary-section" aria-labelledby="ticket-heading">
+  <button
+    class="btn-line diary-template-button"
+    disabled={!$appState.tickets.some(
+      (t) => t.projectId === project.id && !t.voided,
+    )}
+    onclick={() => templateDialog.open()}>템플릿으로 저장</button
+  >
   <h2 id="ticket-heading" class="wave">
     티켓 <span class="badge">{summary.tickets}</span>
   </h2>
@@ -258,3 +267,5 @@
     >
   </div>
 </dialog>
+
+<TicketTemplateDialog bind:this={templateDialog} project={project.id} />

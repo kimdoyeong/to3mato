@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, setContext } from 'svelte';
   import {
     state as appState,
     now,
@@ -23,7 +23,16 @@
   import FocusLog from './components/FocusLog.svelte';
   import DeliveryNotice from './components/DeliveryNotice.svelte';
   import EstimatePicker from './components/EstimatePicker.svelte';
-  let batchDialog: { open: (id: string) => Promise<void> };
+  let batchDialog: {
+    open: (
+      id: string,
+      mode?: 'batch' | 'template',
+      date?: string,
+    ) => Promise<void>;
+  };
+  setContext('open-template', (project: string, date: string) =>
+    batchDialog.open(project, 'template', date),
+  );
   let projectEntry = $state(false);
   let selectedProject = $state<string | null>(null);
   let calendarDate = $state(localDate()),
@@ -229,6 +238,13 @@
             taskDialog.close();
             batchDialog.open(project);
           }}>여러 개 추가</button
+        ><button
+          type="button"
+          disabled={busy}
+          onclick={() => {
+            taskDialog.close();
+            batchDialog.open(project, 'template', date);
+          }}>템플릿</button
         >
       </div>{/if}
     <label

@@ -568,7 +568,8 @@ export function applyCommand(input, command, now = Date.now()) {
     case 'task:batch': {
       if (
         typeof p.project !== 'string' ||
-        !state.projects.some((project) => project.id === p.project)
+        (p.project !== '' &&
+          !state.projects.some((project) => project.id === p.project))
       )
         throw new Error('프로젝트를 찾을 수 없습니다.');
       if (
