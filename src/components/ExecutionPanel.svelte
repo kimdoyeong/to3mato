@@ -2,6 +2,7 @@
   import { state as appState, now, send, notify } from '../lib/client';
   import { localDate, elapsedSeconds, usedPomodoros } from '../lib/domain.mjs';
   import Mascot from './Mascot.svelte';
+  import TomatoGrowth from './TomatoGrowth.svelte';
   import Icon from './Icon.svelte';
   import Tomato from './Tomato.svelte';
   import Pomodoros from './Pomodoros.svelte';
@@ -106,10 +107,13 @@
   {:else}
     <section class="timer-panel paper peach">
       <span class="tape" aria-hidden="true"></span>
-      <Mascot
-        phase={timer ? (rest ? 'rest' : 'focus') : 'idle'}
-        paused={!!timer && !timer.running}
-      />{#if rest || task}<h2 id="focus-title">
+      {#if timer && !rest}<TomatoGrowth
+          progress={elapsed / timer.duration}
+          running={timer.running}
+        />{:else}<Mascot
+          phase={timer ? 'rest' : 'idle'}
+          paused={!!timer && !timer.running}
+        />{/if}{#if rest || task}<h2 id="focus-title">
           {rest ? '휴식' : task?.title}
         </h2>{/if}
       <div
