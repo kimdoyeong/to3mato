@@ -6,6 +6,7 @@
   import Tomato from './Tomato.svelte';
   import Pomodoros from './Pomodoros.svelte';
   import CheckinCard from './CheckinCard.svelte';
+  import Ticket from './Ticket.svelte';
   import Circ from './parts/Circ.svelte';
   import HandBar from './parts/HandBar.svelte';
   let timer = $derived($appState.timer),
@@ -33,6 +34,22 @@
       .reduce((sum, r) => sum + r.pomodoros, 0),
   );
   let capacity = $derived($appState.settings.dailyCapacity);
+  // A newly issued ticket shows for a moment before it goes to the diary.
+  let popped = $state<string | null>(null);
+  let knownTickets = $appState.tickets.length;
+  let popTimer: ReturnType<typeof setTimeout>;
+  $effect(() => {
+    const count = $appState.tickets.length;
+    if (count > knownTickets) {
+      popped = $appState.tickets.at(-1)?.id ?? null;
+      clearTimeout(popTimer);
+      popTimer = setTimeout(() => (popped = null), 2600);
+    }
+    knownTickets = count;
+  });
+  let poppedTicket = $derived(
+    popped ? $appState.tickets.find((t) => t.id === popped) : null,
+  );
   let status = $derived(
     !timer
       ? ''
@@ -74,6 +91,11 @@
   ></svelte:head
 >
 <aside class="execution" aria-label="실행 영역">
+  {#if poppedTicket}
+    <div class="ticket-pop" role="status" aria-live="polite">
+      <Ticket ticket={poppedTicket} />
+    </div>
+  {/if}
   {#if status}<div class="execution-heading">
       <span class="live-tag tag" class:running={timer?.running && !rest}
         >{status}</span

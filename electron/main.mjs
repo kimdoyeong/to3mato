@@ -12,6 +12,7 @@ import {
 } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SQLiteStore } from './storage.mjs';
 import { createTimerTray } from './tray.mjs';
@@ -315,6 +316,56 @@ if (!app.requestSingleInstanceLock()) {
           if (canceled || !filePath) return false;
           await fs.promises.writeFile(filePath, Buffer.from(bytes));
           return true;
+        });
+        // Project cover images live beside the database and are read back
+        // as data URLs so the renderer's CSP (img-src data:) stays unchanged.
+        const imageDirectory = path.join(
+          app.getPath('userData'),
+          'project-images',
+        );
+        const IMAGE_NAME = /^[A-Za-z0-9_-]{1,100}\.(png|jpe?g|webp|gif)$/;
+        const IMAGE_TYPES = {
+          png: 'image/png',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          webp: 'image/webp',
+          gif: 'image/gif',
+        };
+        ipcMain.handle('image:pick', async (event) => {
+          trusted(event);
+          const result = await dialog.showOpenDialog(window, {
+            properties: ['openFile'],
+            filters: [
+              {
+                name: 'Image',
+                extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'],
+              },
+            ],
+          });
+          if (result.canceled || !result.filePaths[0]) return null;
+          const source = result.filePaths[0];
+          const extension = path.extname(source).slice(1).toLowerCase();
+          if (!IMAGE_TYPES[extension])
+            throw new Error('png, jpg, webp, gif 이미지만 사용할 수 있습니다.');
+          if (fs.statSync(source).size > 10 * 1024 * 1024)
+            throw new Error('이미지 크기는 10MB 이하여야 합니다.');
+          fs.mkdirSync(imageDirectory, { recursive: true });
+          const name = `${crypto.randomUUID()}.${extension}`;
+          await fs.promises.copyFile(source, path.join(imageDirectory, name));
+          return name;
+        });
+        ipcMain.handle('image:read', async (event, file) => {
+          trusted(event);
+          if (typeof file !== 'string' || !IMAGE_NAME.test(file)) return '';
+          const target = path.join(imageDirectory, file);
+          if (!target.startsWith(imageDirectory + path.sep)) return '';
+          try {
+            const bytes = await fs.promises.readFile(target);
+            const type = IMAGE_TYPES[path.extname(file).slice(1).toLowerCase()];
+            return `data:${type};base64,${bytes.toString('base64')}`;
+          } catch {
+            return '';
+          }
         });
         ipcMain.handle('data:import', async (event) => {
           trusted(event);

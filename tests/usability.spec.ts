@@ -246,3 +246,78 @@ ui(
     );
   },
 );
+
+ui(
+  'completing a task issues a ticket that the project diary shows and decorates',
+  async ({ appPage: page }) => {
+    const today = page.getByRole('region', { name: '오늘', exact: true });
+    await today
+      .getByRole('button', { name: '프로젝트 아이디어 정리 완료', exact: true })
+      .click();
+    await expect(page.locator('.ticket-pop')).toContainText(
+      '프로젝트 아이디어 정리',
+    );
+    await page.getByRole('button', { name: '프로젝트', exact: true }).click();
+    const cover = page.getByRole('button', { name: /사이드 프로젝트/ });
+    await expect(cover).toContainText('티켓');
+    await cover.click();
+    await page
+      .getByRole('button', { name: '프로젝트 수정', exact: true })
+      .click();
+    const dialog = page.getByRole('dialog', {
+      name: '프로젝트 수정',
+      exact: true,
+    });
+    await dialog.getByLabel('결과물').fill('제안서 초안 PDF');
+    await dialog.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: '사이드 프로젝트' }),
+    ).toBeVisible();
+    await expect(page.locator('.diary-outcome')).toContainText(
+      '제안서 초안 PDF',
+    );
+    const ticket = page
+      .getByRole('region', { name: '작업 영역', exact: true })
+      .getByRole('article', { name: '티켓 프로젝트 아이디어 정리' });
+    await expect(ticket).toContainText('0 / 2');
+    await ticket
+      .getByRole('button', { name: '프로젝트 아이디어 정리 티켓 꾸미기' })
+      .click();
+    const tools = page.getByRole('group', { name: '티켓 꾸미기' });
+    await tools.getByRole('button', { name: '형광펜', exact: true }).click();
+    await tools.getByRole('button', { name: '스티커 별', exact: true }).click();
+    await tools.getByLabel('메모').fill('첫 티켓');
+    await tools.getByLabel('메모').press('Enter');
+    await expect
+      .poll(async () =>
+        (await page.evaluate(() => window.to3mato!.load())).tickets.map(
+          (t) => ({
+            title: t.title,
+            highlight: t.highlight,
+            sticker: t.sticker,
+            note: t.note,
+          }),
+        ),
+      )
+      .toEqual([
+        {
+          title: '프로젝트 아이디어 정리',
+          highlight: true,
+          sticker: 'star',
+          note: '첫 티켓',
+        },
+      ]);
+    await expect(ticket).toContainText('첫 티켓');
+    // Undoing the completion voids the ticket but keeps it on the page.
+    await page.getByRole('button', { name: '할 일', exact: true }).click();
+    await today
+      .getByRole('button', {
+        name: '프로젝트 아이디어 정리 완료 취소',
+        exact: true,
+      })
+      .click();
+    expect(
+      (await page.evaluate(() => window.to3mato!.load())).tickets[0].voided,
+    ).toBe(true);
+  },
+);

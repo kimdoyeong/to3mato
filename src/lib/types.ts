@@ -93,6 +93,8 @@ declare global {
       exportData(): Promise<boolean>;
       exportVideo(bytes: ArrayBuffer, filename: string): Promise<boolean>;
       importData(): Promise<AppState | null>;
+      pickProjectImage(): Promise<string | null>;
+      readProjectImage(file: string): Promise<string>;
     };
   }
 }

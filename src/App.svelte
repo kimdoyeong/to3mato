@@ -11,7 +11,7 @@
     notify,
   } from './lib/client';
   import { localDate, usedPomodoros } from './lib/domain.mjs';
-  import type { Task } from './lib/types';
+  import type { Project, Task } from './lib/types';
   import Icon from './components/Icon.svelte';
   import TodoView from './components/TodoView.svelte';
   import ProjectsView from './components/ProjectsView.svelte';
@@ -39,6 +39,8 @@
     date = $state(''),
     project = $state(''),
     projectName = $state(''),
+    projectOutcome = $state(''),
+    editingProject = $state<string | null>(null),
     busy = $state(false);
   let originalEstimate = $state(1);
   let remaining = $state(1),
@@ -117,8 +119,10 @@
       notify('할 일을 삭제했습니다. 집중 기록은 유지됩니다.');
     } else taskError = $message || '삭제하지 못했습니다. 다시 시도하세요.';
   }
-  async function openProject() {
-    projectName = '';
+  async function openProject(existing: Project | null = null) {
+    editingProject = existing?.id ?? null;
+    projectName = existing?.name ?? '';
+    projectOutcome = existing?.outcome ?? '';
     projectError = '';
     await tick();
     projectDialog.showModal();
@@ -134,11 +138,19 @@
       return;
     }
     busy = true;
-    const success = await send('project:save', { name: projectName });
+    const success = await send('project:save', {
+      id: editingProject,
+      name: projectName,
+      outcome: projectOutcome,
+    });
     busy = false;
     if (success) {
       projectDialog.close();
-      notify('프로젝트를 추가했습니다.');
+      notify(
+        editingProject
+          ? '프로젝트를 수정했습니다.'
+          : '프로젝트를 추가했습니다.',
+      );
     } else projectError = $message || '저장하지 못했습니다. 다시 시도하세요.';
   }
 </script>
@@ -173,7 +185,9 @@
             bind:selected={selectedProject}
             onedit={(task) => openTask(task)}
             onadd={(id) => openTask(null, localDate(), id)}
-            onproject={openProject}
+            onproject={() => openProject()}
+            oneditproject={(project) => openProject(project)}
+            onlog={() => (tab = 'log')}
           />
         {:else if tab === 'calendar'}<CalendarView
             bind:selected={calendarDate}
@@ -317,7 +331,9 @@
 >
   <form onsubmit={addProject}>
     <div class="dialog-heading">
-      <h2 id="project-dialog-title">프로젝트 추가</h2>
+      <h2 id="project-dialog-title">
+        {editingProject ? '프로젝트 수정' : '프로젝트 추가'}
+      </h2>
       <button
         class="icon-button"
         type="button"
@@ -335,6 +351,14 @@
         bind:value={projectName}
         required
         maxlength="80"
+        autocomplete="off"
+      /></label
+    >
+    <label
+      >결과물<input
+        disabled={busy}
+        bind:value={projectOutcome}
+        maxlength="120"
         autocomplete="off"
       /></label
     >

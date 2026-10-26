@@ -61,4 +61,6 @@ contextBridge.exposeInMainWorld('to3mato', {
   exportVideo: (bytes, filename) =>
     ipcRenderer.invoke('video:export', bytes, filename),
   importData: () => ipcRenderer.invoke('data:import'),
+  pickProjectImage: () => ipcRenderer.invoke('image:pick'),
+  readProjectImage: (file) => ipcRenderer.invoke('image:read', file),
 });
