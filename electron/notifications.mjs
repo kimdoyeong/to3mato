@@ -1,4 +1,4 @@
-import { elapsedSeconds } from '../src/lib/domain.mjs';
+import { elapsedSeconds, localDate } from '../src/lib/domain.mjs';
 
 // Capture the completed timer before advanceTimer/applyCommand replaces it.
 export function completedTimerNotification(state, now = Date.now()) {
@@ -13,9 +13,7 @@ export function completedTimerNotification(state, now = Date.now()) {
   const task = state.tasks.find((item) => item.id === timer.taskId);
   return {
     title: '집중 타이머 끝',
-    body: task
-      ? `${task.title} · 1포모도로 완료. 휴식 시간입니다`
-      : '1포모도로 완료. 휴식 시간입니다',
+    body: task ? `${task.title} · 1포모도로 완료.` : '1포모도로 완료.',
   };
 }
 
@@ -47,9 +45,27 @@ export function startedTimerNotification(previous, next, now = Date.now()) {
   };
 }
 
+/** Return the next due ritual without mutating the caller's per-day ledger. */
+export function dueReminder(state, now = Date.now(), fired = {}) {
+  const date = new Date(now);
+  if (!state.settings.remindDays.includes(date.getDay())) return null;
+  const today = localDate(date);
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  for (const [kind, title] of [
+    ['plan', '계획 시작'],
+    ['review', '돌아보기'],
+  ]) {
+    const at = state.settings[kind + 'At'];
+    if (at && time >= at && fired[kind] !== today)
+      return { kind, title, body: '' };
+  }
+  return null;
+}
+
 export function createTimerNotifications({
   Notification,
   getWindow,
+  showMain,
   icon,
   onError = console.error,
 }) {
@@ -62,15 +78,21 @@ export function createTimerNotifications({
       let notification;
       try {
         if (!Notification.isSupported()) return;
-        notification = new Notification({ ...content, icon, silent: false });
+        const { kind, ...options } = content;
+        notification = new Notification({ ...options, icon, silent: false });
         active.add(notification);
         notification.once('click', () => {
           active.delete(notification);
           const window = getWindow();
           if (!window || window.isDestroyed()) return;
-          if (window.isMinimized()) window.restore();
-          window.show();
-          window.focus();
+          if (showMain) showMain();
+          else {
+            if (window.isMinimized()) window.restore();
+            window.show();
+            window.focus();
+          }
+          if (kind === 'plan' || kind === 'review')
+            window.webContents.send('ritual:open', kind);
         });
         notification.once('close', () => active.delete(notification));
         notification.once('failed', (_event, error) => {

@@ -52,7 +52,7 @@ test('background focus and rest completion notify once and clicking restores the
       },
       {
         title: '집중 타이머 끝',
-        body: '프로젝트 아이디어 정리 · 1포모도로 완료. 휴식 시간입니다',
+        body: '프로젝트 아이디어 정리 · 1포모도로 완료.',
       },
     ]);
     // The finished focus waits in the check-in until the user continues.

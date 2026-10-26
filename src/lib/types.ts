@@ -89,6 +89,7 @@ declare global {
       load(): Promise<AppState>;
       dispatch(command: Command): Promise<AppState>;
       subscribe(callback: (state: AppState) => void): () => void;
+      onRitual(callback: (kind: 'plan' | 'review') => void): () => void;
       onError(callback: (message: string) => void): () => void;
       exportData(): Promise<boolean>;
       exportVideo(bytes: ArrayBuffer, filename: string): Promise<boolean>;

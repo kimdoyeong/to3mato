@@ -88,7 +88,7 @@ test('only natural focus/rest completion produces a notification, once per trans
   assert.equal(completedTimerNotification(state, 1500999), null);
   assert.deepEqual(completedTimerNotification(state, 1501000), {
     title: '집중 타이머 끝',
-    body: '프로젝트 아이디어 정리 · 1포모도로 완료. 휴식 시간입니다',
+    body: '프로젝트 아이디어 정리 · 1포모도로 완료.',
   });
   advanceTimer(state, 1501000);
   // The check-in waits for the user and never completes on its own.

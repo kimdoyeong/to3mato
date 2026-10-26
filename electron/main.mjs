@@ -26,6 +26,7 @@ import {
   completedTimerNotification,
   startedTimerNotification,
   createTimerNotifications,
+  dueReminder,
 } from './notifications.mjs';
 import {
   applyCommand,
@@ -197,6 +198,7 @@ if (!app.requestSingleInstanceLock()) {
         const notifications = createTimerNotifications({
           Notification,
           getWindow: () => window,
+          showMain,
           icon: path.join(root, 'electron/assets/icon.png'),
           onError: (error) => {
             console.warn('Timer notification failed:', error);
@@ -393,8 +395,19 @@ if (!app.requestSingleInstanceLock()) {
           if (confirmation.response !== 1) return null;
           return commit(imported, true);
         });
+        const fired = { plan: '', review: '' };
+        let reminderMinute = -1;
         ticker = setInterval(() => {
           const now = Date.now();
+          const minute = Math.floor(now / 60000);
+          if (minute !== reminderMinute) {
+            reminderMinute = minute;
+            let reminder;
+            while ((reminder = dueReminder(state, now, fired))) {
+              fired[reminder.kind] = localDate(new Date(now));
+              notifications.show(reminder);
+            }
+          }
           const completion = completedTimerNotification(state, now);
           const next = structuredClone(state);
           if (advanceTimer(next, now)) {

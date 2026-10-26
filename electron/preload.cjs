@@ -52,6 +52,13 @@ contextBridge.exposeInMainWorld('to3mato', {
     ipcRenderer.on('state:changed', listener);
     return () => ipcRenderer.removeListener('state:changed', listener);
   },
+  onRitual: (callback) => {
+    const listener = (_event, kind) => {
+      if (kind === 'plan' || kind === 'review') callback(kind);
+    };
+    ipcRenderer.on('ritual:open', listener);
+    return () => ipcRenderer.removeListener('ritual:open', listener);
+  },
   onError: (callback) => {
     const listener = (_event, message) => callback(message);
     ipcRenderer.on('state:error', listener);
