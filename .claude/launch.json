@@ -23,6 +23,19 @@
         "dev:web"
       ],
       "port": 4173
+    },
+    {
+      "name": "app-web-alt",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "4176",
+        "--strictPort"
+      ],
+      "port": 4176
     }
   ]
 }
