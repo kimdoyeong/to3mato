@@ -10,7 +10,7 @@
     send,
     notify,
   } from './lib/client';
-  import { localDate, MAX_TASK_ESTIMATE } from './lib/domain.mjs';
+  import { localDate, usedPomodoros } from './lib/domain.mjs';
   import type { Task } from './lib/types';
   import Icon from './components/Icon.svelte';
   import TodoView from './components/TodoView.svelte';
@@ -22,6 +22,7 @@
   import CaptureMoment from './components/CaptureMoment.svelte';
   import FocusLog from './components/FocusLog.svelte';
   import DeliveryNotice from './components/DeliveryNotice.svelte';
+  import EstimatePicker from './components/EstimatePicker.svelte';
   let batchDialog: { open: (id: string) => Promise<void> };
   let projectEntry = $state(false);
   let selectedProject = $state<string | null>(null);
@@ -40,6 +41,9 @@
     projectName = $state(''),
     busy = $state(false);
   let originalEstimate = $state(1);
+  let remaining = $state(1),
+    remainingTouched = $state(false),
+    used = $state(0);
   const tabs = [
     ['todo', '할 일', 'todo'],
     ['projects', '프로젝트', 'folder'],
@@ -70,6 +74,9 @@
     title = task?.title || '';
     estimate = task?.estimate || 1;
     originalEstimate = estimate;
+    remaining = task?.remaining ?? estimate;
+    remainingTouched = false;
+    used = task ? usedPomodoros($appState, task.id) : 0;
     date = task ? task.date : assignedDate;
     project = task?.project || assignedProject;
     await tick();
@@ -92,6 +99,7 @@
       estimate: Number(estimate),
       date,
       project,
+      remaining: editing && remainingTouched ? remaining : undefined,
     });
     busy = false;
     if (success) {
@@ -160,10 +168,7 @@
             })}</span
           >
         </div>
-        {#if tab === 'todo'}<TodoView
-            onedit={(task) => openTask(task)}
-            onadd={(date) => openTask(null, date)}
-          />
+        {#if tab === 'todo'}<TodoView onedit={(task) => openTask(task)} />
         {:else if tab === 'projects'}<ProjectsView
             bind:selected={selectedProject}
             onedit={(task) => openTask(task)}
@@ -226,19 +231,61 @@
       /></label
     >
     <div class="form-grid">
+      <div class="field">
+        <span id="estimate-label">예상 포모도로</span>
+        <div class="estimate-field">
+          <EstimatePicker
+            value={estimate}
+            locked={busy || (!!editing && used > 0)}
+            onchange={(value) => (estimate = value)}
+          />
+          {#if editing && used > 0}<span class="muted estimate-lock"
+              ><Icon name="lock" />처음 예상</span
+            >{/if}
+        </div>
+      </div>
       <label
-        >예상 포모도로<select disabled={busy} bind:value={estimate}
-          >{#each Array.from({ length: MAX_TASK_ESTIMATE }, (_, i) => i + 1) as value}<option
-              {value}>{value} 포모도로</option
-            >{/each}
-          {#if originalEstimate > MAX_TASK_ESTIMATE}<option
-              value={originalEstimate}>{originalEstimate} 포모도로</option
-            >{/if}</select
-        ></label
-      ><label
         >예정일<input disabled={busy} type="date" bind:value={date} /></label
       >
     </div>
+    {#if editing && used > 0}
+      <dl class="estimate-stats">
+        <div class="stat">
+          <dt>처음 예상</dt>
+          <dd class="num">{originalEstimate}</dd>
+        </div>
+        <div class="stat">
+          <dt>실제 사용</dt>
+          <dd class="num">{used}</dd>
+        </div>
+        <div class="stat stat-edit">
+          <dt>남은 예상</dt>
+          <dd>
+            <button
+              type="button"
+              class="step"
+              aria-label="남은 예상 줄이기"
+              disabled={busy || remaining <= 0}
+              onclick={() => {
+                remaining -= 1;
+                remainingTouched = true;
+              }}>−</button
+            >
+            <span class="num">{remaining}</span>
+            <button
+              type="button"
+              class="step"
+              aria-label="남은 예상 늘리기"
+              disabled={busy || remaining >= Math.max(2, originalEstimate)}
+              onclick={() => {
+                remaining += 1;
+                remainingTouched = true;
+              }}>+</button
+            >
+          </dd>
+        </div>
+      </dl>
+    {/if}
     <label
       >프로젝트<select disabled={busy} bind:value={project}
         ><option value="">프로젝트 없음</option

@@ -53,10 +53,8 @@ test('focus start, task switch, resume and rest start notify only on a running t
   assert.equal(state.timer.phase, 'checkin');
   assert.equal(dispatch({ type: 'timer:pause' }, 1808500), null);
   assert.equal(dispatch({ type: 'timer:toggle' }, 1808600), null);
-  assert.deepEqual(dispatch({ type: 'checkin:skip' }, 1809000), {
-    title: '휴식 시작',
-    body: '',
-  });
+  // Rest after the check-in is announced by the focus-end notice already.
+  assert.equal(dispatch({ type: 'checkin:skip' }, 1809000), null);
   assert.equal(dispatch({ type: 'timer:end' }, 1810000), null);
 });
 
@@ -213,12 +211,9 @@ test('an unrelated command at focus expiry leaves a paused check-in without a st
   assert.equal(next.timer.running, false);
   assert.equal(startedTimerNotification(state, next, 1501000), null);
   assert.equal(completedTimerNotification(next, 1501000), null);
-  // Finishing the check-in during a later dispatch announces rest once.
+  // Finishing the check-in later starts rest without another notice.
   const rested = applyCommand(next, { type: 'checkin:done' }, 1502000);
   assert.equal(completedTimerNotification(next, 1502000), null);
-  assert.deepEqual(startedTimerNotification(next, rested, 1502000), {
-    title: '휴식 시작',
-    body: '',
-  });
+  assert.equal(startedTimerNotification(next, rested, 1502000), null);
   assert.equal(rested.tickets.length, 1);
 });

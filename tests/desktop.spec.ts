@@ -30,7 +30,8 @@ test('desktop workflow persists tasks and timer records across restarts', async 
     await expect(
       page.getByRole('navigation', { name: '작업 영역 탭' }),
     ).toBeVisible();
-    await expect(page.locator('.todo-section').first()).toContainText('미지정');
+    await expect(page.locator('.todo-section').first()).toContainText('오늘');
+    await expect(page.locator('.todo-section').last()).toContainText('미지정');
     await expect(page.locator('#clock')).toHaveText('25:00');
     await page.screenshot({
       path: 'test-results/desktop-initial.png',
@@ -41,16 +42,14 @@ test('desktop workflow persists tasks and timer records across restarts', async 
     );
     expect(await page.evaluate(() => !!window.to3mato)).toBe(true);
 
-    await page
-      .getByRole('button', { name: '미지정 할 일 추가', exact: true })
-      .click();
-    await page
+    const backlog = page.getByRole('region', { name: '미지정', exact: true });
+    await backlog
       .getByLabel('할 일 이름', { exact: true })
       .fill('Electron 저장 확인');
-    await page.getByRole('button', { name: '저장', exact: true }).click();
-    await expect(
-      page.getByRole('region', { name: '미지정', exact: true }),
-    ).toContainText('Electron 저장 확인');
+    await backlog
+      .getByRole('button', { name: '미지정 할 일 추가', exact: true })
+      .click();
+    await expect(backlog).toContainText('Electron 저장 확인');
     await page.getByRole('button', { name: '프로젝트', exact: true }).click();
     await page
       .getByRole('button', { name: '프로젝트 추가', exact: true })
@@ -116,13 +115,23 @@ test('desktop workflow persists tasks and timer records across restarts', async 
 
     await page.getByRole('button', { name: '캘린더', exact: true }).click();
     await expect(page.locator('#focus-title')).toHaveText('디자인 강의 수강');
-    await expect(page.locator('#focus-title')).toHaveText('휴식', {
-      timeout: 13_000,
-    });
+    // A finished focus waits in the check-in card; rest starts on 저장.
+    const panel = page.getByRole('complementary', { name: '실행 영역' });
+    await expect(
+      panel.getByRole('heading', { name: '진척 확인', exact: true }),
+    ).toBeVisible({ timeout: 13_000 });
     const completed = await page.evaluate(() => window.to3mato!.load());
     expect(completed.records).toHaveLength(2);
     expect(completed.records[1].pomodoros).toBe(1);
     expect(completed.tasks.find((task) => task.id === 't2')?.done).toBe(false);
+    expect(completed.timer?.phase).toBe('checkin');
+    await panel.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page.locator('#focus-title')).toHaveText('휴식');
+    expect(
+      (await page.evaluate(() => window.to3mato!.load())).tasks.find(
+        (task) => task.id === 't2',
+      )?.remaining,
+    ).toBe(1);
     await page.getByRole('button', { name: '휴식 종료', exact: true }).click();
     await page
       .getByRole('button', { name: '도서 읽기 시작', exact: true })

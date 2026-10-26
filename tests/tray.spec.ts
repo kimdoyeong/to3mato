@@ -200,6 +200,10 @@ test('tray shares the desktop timer, survives closing the main window, and quits
         payload: { id: 't2' },
       });
     });
+    // Natural completion waits in the check-in; the tray can start rest.
+    await expect(popover.locator('#tray-status')).toHaveText('진척 확인');
+    await expect(popover.locator('#tray-primary')).toHaveText('휴식 시작');
+    await popover.locator('#tray-primary').click();
     await expect(popover.locator('#tray-status')).toHaveText('휴식 중');
     await expect(popover.locator('#tray-primary')).toHaveText('일시정지');
     await popover.locator('#tray-primary').click();
@@ -298,6 +302,8 @@ test('tray shares the desktop timer, survives closing the main window, and quits
     await expect
       .poll(() => popover.locator('#tray-clock').innerText())
       .not.toBe(backgroundClock);
+    await expect(popover.locator('#tray-status')).toHaveText('진척 확인');
+    await popover.locator('#tray-primary').click();
     await expect(popover.locator('#tray-status')).toHaveText('휴식 중');
     await popover.locator('#tray-primary').click();
     await expect(popover.locator('#tray-status')).toHaveText('휴식 대기');

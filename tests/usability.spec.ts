@@ -84,7 +84,7 @@ ui(
 );
 
 ui(
-  'single and batch task estimates are limited to six',
+  'single and batch task estimates are limited to two',
   async ({ appPage: page }) => {
     await page.getByRole('button', { name: '프로젝트', exact: true }).click();
     await page.getByRole('button', { name: /사이드 프로젝트/ }).click();
@@ -93,66 +93,65 @@ ui(
       name: '할 일 추가',
       exact: true,
     });
-    await expect(
-      single.getByLabel('예상 포모도로').locator('option'),
-    ).toHaveText([
-      '1 포모도로',
-      '2 포모도로',
-      '3 포모도로',
-      '4 포모도로',
-      '5 포모도로',
-      '6 포모도로',
-    ]);
-    await single.getByLabel('할 일 이름', { exact: true }).fill('6개 작업');
-    await single.getByLabel('예상 포모도로').selectOption('6');
+    const picker = single.getByRole('group', { name: '예상 포모도로' });
+    await expect(picker.getByRole('button')).toHaveText(['1', '2']);
+    await single.getByLabel('할 일 이름', { exact: true }).fill('2개 작업');
+    await picker.getByRole('button', { name: '2', exact: true }).click();
     await single.getByRole('button', { name: '저장', exact: true }).click();
-    expect(
-      (await page.evaluate(() => window.to3mato!.load())).tasks.at(-1)
-        ?.estimate,
-    ).toBe(6);
+    const saved = (await page.evaluate(() => window.to3mato!.load())).tasks.at(
+      -1,
+    );
+    expect(saved?.estimate).toBe(2);
+    expect(saved?.remaining).toBe(2);
     await page.getByRole('button', { name: '할 일 추가', exact: true }).click();
     await single.getByRole('button', { name: '여러 개 추가' }).click();
     const batch = page.getByRole('dialog', { name: '여러 할 일 추가' });
     await expect(
       batch.getByLabel('공통 예상 포모도로', { exact: true }),
-    ).toHaveAttribute('max', '6');
+    ).toHaveAttribute('max', '2');
     await batch.getByLabel('할 일 이름 규칙').fill('작업 %n%');
-    await batch.getByLabel('공통 예상 포모도로', { exact: true }).fill('6');
+    await batch.getByLabel('공통 예상 포모도로', { exact: true }).fill('2');
     await batch.getByRole('button', { name: '목록 생성' }).click();
     await expect(
       batch.getByLabel('1번 예상 포모도로', { exact: true }),
-    ).toHaveAttribute('max', '6');
+    ).toHaveAttribute('max', '2');
     await expect(
       batch.getByLabel('1번 예상 포모도로', { exact: true }),
-    ).toHaveValue('6');
+    ).toHaveValue('2');
   },
 );
 
 ui(
   'task and project forms focus names and keep errors inside the dialog',
   async ({ appPage: page }) => {
-    await page
+    // The quick-add line in a section saves without opening a dialog.
+    const backlog = page.getByRole('region', { name: '미지정', exact: true });
+    const name = backlog.getByLabel('할 일 이름', { exact: true });
+    await name.fill('   ');
+    await backlog
       .getByRole('button', { name: '미지정 할 일 추가', exact: true })
       .click();
-    const dialog = page.getByRole('dialog', {
-      name: '할 일 추가',
-      exact: true,
-    });
-    const name = dialog.getByLabel('할 일 이름', { exact: true });
+    await expect(page.getByRole('status')).toHaveText(
+      '할 일 이름을 입력하세요.',
+    );
     await expect(name).toBeFocused();
-    await name.fill('   ');
-    await dialog.getByRole('button', { name: '저장', exact: true }).click();
-    await expect(dialog.getByRole('alert')).toBeVisible();
     expect(
       (await page.evaluate(() => window.to3mato!.load())).tasks,
     ).toHaveLength(5);
     await name.fill('키보드로 추가');
     await name.press('Enter');
-    await expect(dialog).not.toBeVisible();
+    await expect(backlog).toContainText('키보드로 추가');
+    await expect(name).toHaveValue('');
     await page
       .getByRole('button', { name: '키보드로 추가 수정', exact: true })
       .click();
-    await expect(page.getByLabel('할 일 이름', { exact: true })).toBeFocused();
+    const editing = page.getByRole('dialog', {
+      name: '할 일 수정',
+      exact: true,
+    });
+    await expect(
+      editing.getByLabel('할 일 이름', { exact: true }),
+    ).toBeFocused();
     // Simulate the edited task being removed while the dialog is open.
     await page.evaluate(async () => {
       const state = await window.to3mato!.load();
@@ -161,10 +160,6 @@ ui(
         type: 'task:delete',
         payload: { id: task.id },
       });
-    });
-    const editing = page.getByRole('dialog', {
-      name: '할 일 수정',
-      exact: true,
     });
     await editing
       .getByLabel('할 일 이름', { exact: true })

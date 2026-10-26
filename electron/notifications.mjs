@@ -23,12 +23,14 @@ export function startedTimerNotification(previous, next, now = Date.now()) {
   const timer = next.timer;
   if (!timer?.running) return null;
   const before = previous.timer;
-  // Focus completion already announces the automatically started rest.
+  // Focus completion already announced the end; the rest that follows a
+  // finished focus or its check-in needs no second notice.
   if (
-    before?.running &&
-    before.phase === 'focus' &&
     timer.phase === 'rest' &&
-    elapsedSeconds(before, now) >= before.duration
+    ((before?.running &&
+      before.phase === 'focus' &&
+      elapsedSeconds(before, now) >= before.duration) ||
+      before?.phase === 'checkin')
   )
     return null;
   if (

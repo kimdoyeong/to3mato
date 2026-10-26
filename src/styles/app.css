@@ -260,3 +260,205 @@ dialog.batch-dialog {
   margin: 16px 0 0;
   font-size: 16px;
 }
+
+/* ───────── 리워크 1단계: 할 일 탭, 진척 확인, 상세 대화상자 ───────── */
+.todo-section-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.todo-section-heading h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.capacity-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.capacity-value {
+  font-size: 22px;
+  min-width: 26px;
+  text-align: center;
+}
+.todo-section > .capacity-row,
+.todo-section > .paper.capacity {
+  margin-bottom: 12px;
+}
+.task-row .handle {
+  margin-right: -4px;
+}
+.circ-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.task-estimate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.task-row .task-estimate .seg.off {
+  pointer-events: none;
+}
+.task-row .task-date {
+  margin-left: 8px;
+  color: var(--muted);
+}
+.task-row.drag-over {
+  outline: 3px dashed var(--red);
+  outline-offset: 4px;
+}
+.task-row .btn-line {
+  flex-shrink: 0;
+}
+.todo-section .quick {
+  margin-top: 10px;
+}
+.todo-section .quick .icon {
+  color: var(--line-strong);
+  flex-shrink: 0;
+}
+.timer-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.timer-panel .tape {
+  left: 50%;
+}
+.timer-panel.checkin {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  text-align: left;
+}
+.timer-panel.checkin > h2 {
+  text-align: center;
+  font-size: 26px;
+}
+.timer-panel.checkin .receipt {
+  width: 100%;
+  margin-bottom: 14px;
+}
+.receipt-task {
+  margin: 0 0 6px;
+  font-size: 19px;
+  text-align: center;
+}
+.receipt-lines {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rline dt .icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+.rline dd .tomatoes {
+  gap: 2px;
+}
+.rline dd .mini-tomato {
+  width: 15px;
+  height: 15px;
+}
+.receipt-total {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  padding-top: 8px;
+}
+.checkin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.checkin-actions .primary {
+  padding: 9px 20px 8px;
+  font-size: 18px;
+}
+.checkin-hint {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+}
+.daily-summary .tape.r {
+  right: 28px;
+}
+dialog .field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 16px;
+  margin-bottom: 19px;
+}
+.estimate-field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+}
+.estimate-field .seg-b {
+  width: 56px;
+  height: 40px;
+  font-size: 20px;
+}
+.estimate-lock {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.estimate-lock .icon {
+  width: 14px;
+  height: 14px;
+}
+.estimate-stats {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 19px;
+}
+.estimate-stats .stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 2px solid var(--line);
+  border-radius: var(--wobble-s);
+  background: #faf3e8;
+}
+.estimate-stats .stat-edit {
+  background: #fff;
+  border-color: #f08b72;
+}
+.estimate-stats dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+.estimate-stats dd {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

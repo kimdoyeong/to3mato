@@ -55,9 +55,10 @@ test('background focus and rest completion notify once and clicking restores the
         body: '프로젝트 아이디어 정리 · 1포모도로 완료. 휴식 시간입니다',
       },
     ]);
+    // The finished focus waits in the check-in until the user continues.
     expect(
-      (await page.evaluate(() => window.to3mato!.load())).timer?.running,
-    ).toBe(true);
+      (await page.evaluate(() => window.to3mato!.load())).timer,
+    ).toMatchObject({ phase: 'checkin', running: false });
     await app.evaluate(() =>
       (globalThis as any).timerNotices[1].instance.emit('click'),
     );
@@ -71,6 +72,9 @@ test('background focus and rest completion notify once and clicking restores the
       ),
     ).toBe(true);
     await page.reload();
+    await page.evaluate(() =>
+      window.to3mato!.dispatch({ type: 'checkin:skip' }),
+    );
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()
         .find((window) => !window.webContents.getURL().endsWith('/tray.html'))!

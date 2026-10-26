@@ -32,11 +32,15 @@ test('browser imports demo data and preserves edits and date moves', async () =>
     await page
       .getByRole('button', { name: '기존 데모 작업 수정', exact: true })
       .click();
-    await page.getByLabel('할 일 이름', { exact: true }).fill('수정한 작업');
-    await page
-      .getByRole('dialog', { name: '할 일 수정', exact: true })
-      .getByLabel('예상 포모도로')
-      .selectOption('3');
+    const editing = page.getByRole('dialog', {
+      name: '할 일 수정',
+      exact: true,
+    });
+    await editing.getByLabel('할 일 이름', { exact: true }).fill('수정한 작업');
+    await editing
+      .getByRole('group', { name: '예상 포모도로' })
+      .getByRole('button', { name: '2', exact: true })
+      .click();
     await page.getByLabel('예정일', { exact: true }).fill(offsetDate(1));
     await page.getByRole('button', { name: '저장', exact: true }).click();
     await expect(
@@ -86,7 +90,8 @@ test('browser imports demo data and preserves edits and date moves', async () =>
     );
     expect(exported.tasks[0]).toMatchObject({
       title: '수정한 작업',
-      estimate: 3,
+      estimate: 2,
+      remaining: 2,
       date: offsetDate(1),
       done: true,
     });

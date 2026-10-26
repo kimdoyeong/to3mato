@@ -1,12 +1,16 @@
 <script lang="ts">
   import { state as appState, now, send, notify } from '../lib/client';
-  import { localDate, elapsedSeconds } from '../lib/domain.mjs';
+  import { localDate, elapsedSeconds, usedPomodoros } from '../lib/domain.mjs';
   import Mascot from './Mascot.svelte';
   import Icon from './Icon.svelte';
   import Tomato from './Tomato.svelte';
   import Pomodoros from './Pomodoros.svelte';
+  import CheckinCard from './CheckinCard.svelte';
+  import Circ from './parts/Circ.svelte';
+  import HandBar from './parts/HandBar.svelte';
   let timer = $derived($appState.timer),
     rest = $derived(timer?.phase === 'rest'),
+    checkin = $derived(timer?.phase === 'checkin'),
     today = $derived(localDate(new Date($now)));
   let tasks = $derived($appState.tasks.filter((t) => t.date === today)),
     pending = $derived(tasks.filter((t) => !t.done));
@@ -27,6 +31,20 @@
     $appState.records
       .filter((r) => localDate(new Date(r.at)) === today)
       .reduce((sum, r) => sum + r.pomodoros, 0),
+  );
+  let capacity = $derived($appState.settings.dailyCapacity);
+  let status = $derived(
+    !timer
+      ? ''
+      : checkin
+        ? '진척 확인'
+        : rest
+          ? timer.running
+            ? '휴식 중'
+            : '휴식 대기'
+          : timer.running
+            ? '집중 중'
+            : '일시정지',
   );
   async function play(id: string) {
     if (timer?.phase === 'focus' && timer.taskId === id && timer.running) {
@@ -56,64 +74,71 @@
   ></svelte:head
 >
 <aside class="execution" aria-label="실행 영역">
-  {#if timer}<div class="execution-heading">
-      <span class="live-tag" class:running={timer.running && !rest}
-        >{rest
-          ? timer.running
-            ? '휴식 중'
-            : '휴식 대기'
-          : timer.running
-            ? '집중 중'
-            : '일시정지'}</span
+  {#if status}<div class="execution-heading">
+      <span class="live-tag tag" class:running={timer?.running && !rest}
+        >{status}</span
       >
     </div>{/if}
-  <section class="timer-panel">
-    <Mascot
-      phase={timer ? (rest ? 'rest' : 'focus') : 'idle'}
-      paused={!!timer && !timer.running}
-    />{#if rest || task}<h2 id="focus-title">
-        {rest ? '휴식' : task?.title}
-      </h2>{/if}
-    <div
-      class="clock"
-      id="clock"
-      role="timer"
-      aria-label={`남은 시간 ${clock}`}
-    >
-      {#each [...clock] as digit, i (i)}<span
-          class={digit === ':' ? 'colon' : 'digit'}>{digit}</span
-        >{/each}
-    </div>
-    <div class="timer-track">
+  {#if checkin && task}
+    <CheckinCard {task} used={usedPomodoros($appState, task.id)} />
+  {:else}
+    <section class="timer-panel paper peach">
+      <span class="tape" aria-hidden="true"></span>
+      <Mascot
+        phase={timer ? (rest ? 'rest' : 'focus') : 'idle'}
+        paused={!!timer && !timer.running}
+      />{#if rest || task}<h2 id="focus-title">
+          {rest ? '휴식' : task?.title}
+        </h2>{/if}
       <div
-        style:width={timer ? `${(elapsed / timer.duration) * 100}%` : '0%'}
-      ></div>
-    </div>
-    <div class="timer-actions">
-      <button
-        class="primary"
-        disabled={!timer && !pending.length}
-        onclick={() => (timer ? send('timer:toggle') : play(pending[0].id))}
-        ><Icon name={timer?.running ? 'pause' : 'play'} />{timer
-          ? timer.running
-            ? '일시정지'
-            : rest
-              ? '휴식 시작'
-              : '집중 재개'
-          : '집중 시작'}</button
-      ><button
-        class="icon-button end-button"
-        disabled={!timer}
-        onclick={end}
-        aria-label={rest ? '휴식 종료' : '집중 종료'}
-        title={rest ? '휴식 종료' : '집중 종료'}
-        ><Icon name={rest ? 'arrow' : 'stop'} /></button
+        class="clock"
+        id="clock"
+        role="timer"
+        aria-label={`남은 시간 ${clock}`}
       >
-    </div>
-  </section>
+        {#each [...clock] as digit, i (i)}<span
+            class={digit === ':' ? 'colon' : 'digit'}>{digit}</span
+          >{/each}
+      </div>
+      <div class="timer-track">
+        <HandBar value={timer ? elapsed / timer.duration : 0} />
+      </div>
+      {#if task && !rest}
+        <div class="timer-progress muted">
+          예상 <Pomodoros
+            estimate={task.estimate}
+            actual={usedPomodoros($appState, task.id)}
+          />
+        </div>
+      {/if}
+      <div class="timer-actions">
+        <button
+          class="primary"
+          disabled={!timer && !pending.length}
+          onclick={() => (timer ? send('timer:toggle') : play(pending[0].id))}
+          ><Icon name={timer?.running ? 'pause' : 'play'} />{timer
+            ? timer.running
+              ? '일시정지'
+              : rest
+                ? '휴식 시작'
+                : '집중 재개'
+            : '집중 시작'}</button
+        ><button
+          class="icon-button end-button"
+          disabled={!timer}
+          onclick={end}
+          aria-label={rest ? '휴식 종료' : '집중 종료'}
+          title={rest ? '휴식 종료' : '집중 종료'}
+          ><Icon name={rest ? 'arrow' : 'stop'} /></button
+        >
+      </div>
+    </section>
+  {/if}
   <section class="today-section">
     <div class="section-heading">
-      <h2>오늘 할 일 <span class="count">{pending.length}</span></h2>
+      <h2 class="wave">
+        오늘 할 일 <span class="count badge">{pending.length}</span>
+      </h2>
       <span
         >예상 <span class="pomo-count"
           >{tasks.reduce((sum, t) => sum + t.estimate, 0)}<Tomato
@@ -123,27 +148,24 @@
       >
     </div>
     {#each tasks as item, i (item.id)}{@const active =
-        timer?.phase === 'focus' && timer.taskId === item.id}
-      <div class="today-row" class:active class:done={item.done}>
-        <span class="today-number"
-          >{#if item.done}<Icon name="check" />{:else}{String(i + 1).padStart(
-              2,
-              '0',
-            )}{/if}</span
-        >
+        timer?.phase !== 'rest' && timer?.taskId === item.id}
+      <div class="today-row exec-row" class:active class:done={item.done}>
+        <Circ
+          n={item.done ? 'check' : i + 1}
+          state={item.done ? 'ok' : active ? 'on' : ''}
+        />
         <div class="today-info">
           <div class="today-name" class:task-title={item.done}>
             {item.title}
           </div>
           <Pomodoros
             estimate={item.estimate}
-            actual={$appState.records
-              .filter((r) => r.taskId === item.id)
-              .reduce((sum, r) => sum + r.pomodoros, 0)}
+            actual={usedPomodoros($appState, item.id)}
           />
         </div>
         <button
-          class="play-button"
+          class="play-button play"
+          class:active={active && timer?.running}
           disabled={item.done}
           onclick={() => play(item.id)}
           aria-label={`${item.title} ${active && timer?.running ? '일시정지' : '시작'}`}
@@ -151,10 +173,11 @@
         >
       </div>{:else}<div class="empty">오늘 예정된 할 일이 없습니다.</div>{/each}
   </section>
-  <div class="daily-summary">
+  <div class="daily-summary paper butter" aria-label="오늘 완료 포모도로">
+    <span class="tape r green" aria-hidden="true"></span>
     <div><strong>{daily} <small>포모도로</small></strong></div>
     <div class="daily-dots">
-      {#each Array(Math.max(3, Math.min(8, Math.ceil(daily)))) as _, i}<Tomato
+      {#each Array(Math.max(capacity, Math.ceil(daily))) as _, i (i)}<Tomato
           filled={i < daily}
         />{/each}
     </div>

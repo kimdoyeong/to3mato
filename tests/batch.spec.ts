@@ -63,7 +63,7 @@ test('project batch preview highlights templates and saves independent edited ta
       .fill('직접 수정한 이름');
     await dialog.getByLabel('1번 예정일', { exact: true }).fill('2026-11-01');
     await dialog.getByLabel('2번 예정일', { exact: true }).fill('2026-11-02');
-    await dialog.getByLabel('2번 예상 포모도로', { exact: true }).fill('5');
+    await dialog.getByLabel('2번 예상 포모도로', { exact: true }).fill('2');
     await expect(
       dialog.getByLabel('2번 할 일 이름', { exact: true }),
     ).toHaveValue('독서 (2) · 2026-11-02');
@@ -90,14 +90,16 @@ test('project batch preview highlights templates and saves independent edited ta
     });
     expect(added[1]).toMatchObject({
       title: '독서 (2) · 2026-11-02',
-      estimate: 5,
+      estimate: 2,
     });
     expect(Object.keys(added[0]).sort()).toEqual([
       'date',
       'done',
       'estimate',
+      'followUpOf',
       'id',
       'project',
+      'remaining',
       'title',
     ]);
     await page
