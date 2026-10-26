@@ -1,4 +1,5 @@
 import { elapsedSeconds, localDate } from '../src/lib/domain.mjs';
+import { calendarTimeZone } from '../src/lib/calendar-time.mjs';
 
 // Capture the completed timer before advanceTimer/applyCommand replaces it.
 export function completedTimerNotification(state, now = Date.now()) {
@@ -59,10 +60,21 @@ const RITUALS = [
  */
 export function nextReminder(state, now = Date.now(), ledger = {}) {
   const date = new Date(now);
-  if (!state.settings.remindDays.includes(date.getDay()))
-    return { reminder: null, settled: [] };
   const today = localDate(date);
-  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  if (
+    !state.settings.remindDays.includes(
+      new Date(today + 'T12:00:00Z').getUTCDay(),
+    )
+  )
+    return { reminder: null, settled: [] };
+  const time = calendarTimeZone()
+    ? new Intl.DateTimeFormat('en-GB', {
+        timeZone: calendarTimeZone(),
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      }).format(date)
+    : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   const due = RITUALS.filter(([kind, key]) => {
     const at = state.settings[key];
     return (

@@ -14,9 +14,7 @@ import {
   validateSettings,
 } from '../src/lib/domain.mjs';
 
-export const SCHEMA_VERSION = 4;
-const TOMBSTONE_DAYS = 30;
-const DAY = 24 * 60 * 60 * 1000;
+export const SCHEMA_VERSION = 5;
 
 // Kept so v1 databases can be read during migration and recreated in tests.
 export const SCHEMA_V1 = `
@@ -548,7 +546,7 @@ export class SQLiteStore {
         const version = this.db
           .prepare('PRAGMA user_version')
           .get().user_version;
-        if (![0, 1, 2, 3, SCHEMA_VERSION].includes(version))
+        if (![0, 1, 2, 3, 4, SCHEMA_VERSION].includes(version))
           throw new Error(`지원하지 않는 DB 버전입니다: ${version}`);
         if (version === 0) this.create();
         else if (version === 1) this.migrateV1();
@@ -556,9 +554,9 @@ export class SQLiteStore {
           if (version === 2) this.migrateV2();
           if (version <= 3) this.migrateV3();
         }
+        if (version < 5) this.migrateV4();
         this.db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;');
         this.openSyncState();
-        this.transaction(() => this.removeOldTombstones());
       } catch (error) {
         this.close();
         throw error;
@@ -598,8 +596,39 @@ export class SQLiteStore {
       this.db.exec(SCHEMA_V4);
       this.initSyncState();
       this.writeChanges(initial, null);
-      this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+      this.db.exec('PRAGMA user_version = 4');
     });
+  }
+  migrateV4() {
+    this.snapshot(
+      path.join(path.dirname(this.file), 'to3mato.pre-v5.sqlite3'),
+      false,
+    );
+    this.transaction(() => {
+      this.db.exec(`CREATE TABLE IF NOT EXISTS sync_document (
+        id INTEGER PRIMARY KEY CHECK(id = 1), data TEXT NOT NULL
+      ) STRICT;
+      PRAGMA user_version = 5;`);
+    });
+  }
+  readEnvelope() {
+    if (!this.db) this.load();
+    const row = this.statement(
+      'SELECT data FROM sync_document WHERE id = 1',
+    ).get();
+    return row ? JSON.parse(row.data) : null;
+  }
+  saveEnvelope(envelope, state) {
+    if (!this.db) this.load();
+    const next = normalizeState(state);
+    const data = JSON.stringify(envelope);
+    this.transaction(() => {
+      this.writeChanges(next, this.previous);
+      this.statement(
+        'INSERT INTO sync_document (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data',
+      ).run(data);
+    });
+    this.previous = structuredClone(next);
   }
   migrateV2() {
     this.snapshot(
@@ -643,7 +672,7 @@ export class SQLiteStore {
         DROP TABLE changes;
         ALTER TABLE changes_v4 RENAME TO changes;
         CREATE INDEX changes_row_idx ON changes(entity, id);
-        PRAGMA user_version = ${SCHEMA_VERSION};
+        PRAGMA user_version = 4;
       `);
       this.statements.clear();
     });
@@ -661,7 +690,7 @@ export class SQLiteStore {
       this.db.exec(SCHEMA_V4);
       this.initSyncState();
       this.writeChanges(state, null);
-      this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+      this.db.exec('PRAGMA user_version = 4');
     });
   }
   readStateV1() {
@@ -894,16 +923,8 @@ export class SQLiteStore {
     }
   }
   removeOldTombstones() {
-    const cutoff = formatHLC(
-      Math.max(0, this.now() - TOMBSTONE_DAYS * DAY),
-      0,
-      '',
-    );
-    for (const [entity, { table }] of Object.entries(ENTITIES)) {
-      this.statement(
-        `DELETE FROM ${table} WHERE deleted = 1 AND updated_at < ? AND NOT EXISTS (SELECT 1 FROM changes WHERE changes.entity = ? AND changes.id = ${table}.id)`,
-      ).run(cutoff, entity);
-    }
+    // No age-only collection: disconnected devices may still carry deleted rows.
+    // A future snapshot/epoch compactor must explicitly prove a safe watermark.
   }
   /** Dense positions keep the load order stable after remote rows share a position. */
   renumber(entity) {
@@ -1082,14 +1103,11 @@ export class SQLiteStore {
       );
     });
   }
-  /** Stop logging after sign-out. Unsent changes are dropped; resetSync resends everything. */
+  /** Stop transport logging without discarding changes or the last acknowledged cursor. */
   disableSync() {
     if (!this.db) this.load();
     this.transaction(() => {
-      this.db.exec('DELETE FROM changes');
-      this.statement(
-        'UPDATE sync_state SET logging = 0, cursor = 0, last_sync_at = NULL WHERE id = 1',
-      ).run();
+      this.statement('UPDATE sync_state SET logging = 0 WHERE id = 1').run();
       this.logging = false;
     });
   }

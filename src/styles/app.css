@@ -1280,3 +1280,128 @@ dialog .field {
 .review-heading {
   scroll-margin-top: 24px;
 }
+
+/* 첫 실행 안내와 계정 폼 */
+dialog.onboarding {
+  width: 520px;
+  padding: 28px 34px 26px;
+  text-align: center;
+}
+.onboarding-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.onboarding-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.onboarding-dots span.on {
+  width: 22px;
+  border-radius: 99px;
+  background: var(--red);
+}
+/* 단계가 바뀌어도 아래 버튼 위치가 움직이지 않도록 본문 높이를 맞춘다 */
+.onboarding-content.intro {
+  min-height: 236px;
+}
+.onboarding-art {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  height: 100px;
+  margin-bottom: 14px;
+}
+.onboarding-art .tomato-illustration {
+  width: 104px;
+  height: 94px;
+  margin: 0;
+}
+.onboarding-art .mini-tomato {
+  width: 46px;
+  height: 46px;
+}
+.onboarding-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: var(--text-xl, 26px);
+  line-height: 1.35;
+  outline: none;
+}
+.onboarding-body {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: var(--text-md, 17px);
+  line-height: 1.55;
+}
+.onboarding .auth-form {
+  margin-top: 18px;
+  text-align: left;
+}
+.onboarding-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+}
+.onboarding-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.auth-form .add-mode {
+  margin-bottom: 14px;
+}
+.auth-step + .auth-step {
+  margin-top: 14px;
+}
+.auth-step p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: var(--text-sm, 15px);
+}
+.auth-step label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: var(--text-sm, 15px);
+  color: var(--muted);
+}
+.auth-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.auth-field input {
+  flex: 1;
+  min-width: 0;
+}
+.auth-field .btn-line,
+.auth-field .primary {
+  flex: none;
+  white-space: nowrap;
+}
+.auth-field .primary {
+  padding: 8px 20px 7px;
+  font-size: var(--text-base, 16px);
+}
+@media (max-width: 560px) {
+  dialog.onboarding {
+    padding: 24px 18px 20px;
+  }
+  .auth-field {
+    flex-wrap: wrap;
+  }
+  .auth-field .btn-line,
+  .auth-field .primary {
+    width: 100%;
+  }
+}

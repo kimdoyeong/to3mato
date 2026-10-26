@@ -6,6 +6,12 @@
   let now = $state(Date.now());
   let error = $state('');
   let busy = $state(false);
+  let clockBase = Date.now(),
+    clockTick = performance.now();
+  const time = () =>
+    appState?.syncContext
+      ? clockBase + performance.now() - clockTick
+      : Date.now();
   const view = $derived(appState ? timerMenuState(appState, now) : null);
   onMount(() => {
     const api = window.to3mato!;
@@ -14,7 +20,9 @@
     const unsubscribe = api.subscribe((value) => {
       received = true;
       appState = value;
-      now = Date.now();
+      clockBase = Date.now() + (value.syncContext?.offset || 0);
+      clockTick = performance.now();
+      now = time();
     });
     const unsubscribeError = api.onError((message) => {
       error = message;
@@ -22,7 +30,12 @@
     api
       .load()
       .then((value) => {
-        if (active && !received) appState = value;
+        if (active && !received) {
+          appState = value;
+          clockBase = Date.now() + (value.syncContext?.offset || 0);
+          clockTick = performance.now();
+          now = time();
+        }
       })
       .catch((e) => {
         if (active) error = String(e.message);
@@ -31,10 +44,10 @@
     let windowVisible = false;
     const visibility = () => {
       clearInterval(interval);
-      now = Date.now();
+      now = time();
       if (windowVisible)
         interval = setInterval(() => {
-          now = Date.now();
+          now = time();
         }, 250);
     };
     const unsubscribeVisibility = api.subscribeVisibility((visible) => {

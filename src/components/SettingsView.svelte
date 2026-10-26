@@ -11,6 +11,7 @@
     importBrowser,
   } from '../lib/client';
   import WeekdayPicker from './WeekdayPicker.svelte';
+  import AccountSettings from './AccountSettings.svelte';
   let { onreview }: { onreview: () => void } = $props();
   import Tomato from './Tomato.svelte';
   let input: HTMLInputElement;
@@ -61,6 +62,8 @@
       notify('다음 포모도로부터 적용됩니다.');
   }
 </script>
+
+<AccountSettings />
 
 <section class="settings-card" aria-labelledby="reminder-title">
   <h2 id="reminder-title">알림</h2>

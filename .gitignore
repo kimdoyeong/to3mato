@@ -18,6 +18,7 @@ supabase/.branches/
 # Local credentials and environment configuration
 .env
 .env.*
+/electron/supabase-config.json
 !.env.example
 *.pem
 *.key

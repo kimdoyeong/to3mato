@@ -10,6 +10,8 @@ import {
 import type { AppState, Command } from './types';
 import { finishRitual } from './ritual-state';
 import { capturePrompt, completedMoment } from './focus-log';
+import { syncContext, currentTime } from './sync-context';
+import { setCalendarTimeZone } from './calendar-time.mjs';
 export const state = writable<AppState>(createInitialState());
 export const now = writable(Date.now());
 export const ready = writable(false);
@@ -25,8 +27,12 @@ export function notify(text: string) {
 const key = 'to3mato-state-v1';
 function receiveState(next: AppState) {
   const previous = get(state);
+  syncContext.set(next.syncContext);
+  setCalendarTimeZone(next.syncContext?.timeZone);
   const moment = completedMoment(previous, next);
   if (
+    (!next.syncContext ||
+      next.syncContext.controller === next.syncContext.deviceId) &&
     next.timer?.phase === 'focus' &&
     next.timer.running &&
     (!previous.timer?.running ||
@@ -77,7 +83,10 @@ export async function initialize() {
     if (window.to3mato) {
       unsubscribe = window.to3mato.subscribe(receiveState);
       unsubscribeError = window.to3mato.onError(notify);
-      state.set(await window.to3mato.load());
+      const loaded = await window.to3mato.load();
+      syncContext.set(loaded.syncContext);
+      setCalendarTimeZone(loaded.syncContext?.timeZone);
+      state.set(loaded);
     } else {
       const raw =
         localStorage.getItem(key) || localStorage.getItem('to3mato-demo-v1');
@@ -95,7 +104,7 @@ export async function initialize() {
     );
   }
   const interval = setInterval(() => {
-    now.set(Date.now());
+    now.set(currentTime());
     if (!window.to3mato && get(ready)) {
       const next = structuredClone(get(state));
       if (advanceTimer(next)) {

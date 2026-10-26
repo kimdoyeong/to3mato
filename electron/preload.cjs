@@ -1,5 +1,45 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('to3mato', {
+  account: {
+    status: () => ipcRenderer.invoke('account:status'),
+    requestCode: (email, mode) =>
+      ipcRenderer.invoke('account:requestCode', email, mode),
+    verify: (email, code) => ipcRenderer.invoke('account:verify', email, code),
+    enable: () => ipcRenderer.invoke('account:enable'),
+    mediaAdopted: () => ipcRenderer.invoke('account:mediaAdopted'),
+    disable: () => ipcRenderer.invoke('account:disable'),
+    logout: () => ipcRenderer.invoke('account:logout'),
+    remove: () => ipcRenderer.invoke('account:remove'),
+    syncNow: () => ipcRenderer.invoke('account:now'),
+    resolve: (id, action) => ipcRenderer.invoke('account:resolve', id, action),
+    subscribe: (callback) => {
+      let active = true,
+        received = false;
+      const listener = (_event, value) => {
+        received = true;
+        if (active) callback(value);
+      };
+      ipcRenderer.on('account:status', listener);
+      ipcRenderer
+        .invoke('account:status')
+        .then((value) => {
+          if (active && !received) callback(value);
+        })
+        .catch(() => {});
+      return () => {
+        active = false;
+        ipcRenderer.removeListener('account:status', listener);
+      };
+    },
+  },
+  sync: {
+    extra: (entity, id, fields, deleted = false, owner) =>
+      ipcRenderer.invoke('sync:extra', entity, id, fields, deleted, owner),
+    putAsset: (id, mime, bytes, owner) =>
+      ipcRenderer.invoke('sync:asset-put', id, mime, bytes, owner),
+    readAsset: (id, owner) => ipcRenderer.invoke('sync:asset-read', id, owner),
+    projectImages: () => ipcRenderer.invoke('sync:project-images'),
+  },
   version: () => ipcRenderer.invoke('app:version'),
   update: {
     check: () => ipcRenderer.invoke('update:check'),
@@ -51,6 +91,10 @@ contextBridge.exposeInMainWorld('to3mato', {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on('state:changed', listener);
     return () => ipcRenderer.removeListener('state:changed', listener);
+  },
+  onboarding: {
+    status: () => ipcRenderer.invoke('onboarding:status'),
+    finish: () => ipcRenderer.invoke('onboarding:finish'),
   },
   ritualDates: () => ipcRenderer.invoke('ritual:dates'),
   finishRitual: (kind, date) => ipcRenderer.invoke('ritual:finish', kind, date),

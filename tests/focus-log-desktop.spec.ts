@@ -45,10 +45,11 @@ test('desktop captures, automatically delivers missed weeks and downloads throug
     await expect(page.locator('.moment-card')).toHaveCount(1);
     // Move the saved moment to a closed week, then restart to test missed delivery recovery.
     await page.evaluate(async () => {
-      const request = indexedDB.open('to3mato-focus-log', 2);
-      const database = await new Promise<IDBDatabase>(
-        (resolve) => (request.onsuccess = () => resolve(request.result)),
-      );
+      const request = indexedDB.open('to3mato-focus-log');
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
       await new Promise<void>((resolve, reject) => {
         const tx = database.transaction(['clips', 'summaries'], 'readwrite');
         const read = tx.objectStore('clips').getAll();

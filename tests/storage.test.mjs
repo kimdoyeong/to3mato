@@ -232,7 +232,7 @@ function assertMigratedV3(f, store, state) {
     store.db.prepare('PRAGMA user_version').get().user_version,
     SCHEMA_VERSION,
   );
-  assert.equal(SCHEMA_VERSION, 4);
+  assert.equal(SCHEMA_VERSION, 5);
   // Existing estimates above the new cap are kept; remaining starts equal.
   assert.deepEqual(
     state.tasks.map((task) => [

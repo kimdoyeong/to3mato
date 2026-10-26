@@ -1,13 +1,15 @@
 import { get, writable } from 'svelte/store';
 import { localDate } from './domain.mjs';
-const key = 'to3mato-rituals-v1';
+import { currentSync, dataScope, syncContext } from './sync-context';
+const key = () =>
+  `to3mato-rituals-v1${dataScope() === 'local' ? '' : ':' + dataScope()}`;
 type Dates = { plannedDate: string; reviewedDate: string };
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const valid = (value: unknown) =>
   typeof value === 'string' && DATE.test(value) ? value : '';
 function read(): Dates {
   try {
-    const data = JSON.parse(localStorage.getItem(key) || '{}');
+    const data = JSON.parse(localStorage.getItem(key()) || '{}');
     return {
       plannedDate: valid(data?.plannedDate),
       reviewedDate: valid(data?.reviewedDate),
@@ -20,10 +22,26 @@ function store(dates: Dates) {
   ritualDates.set(dates);
   // Ritual visibility must still work when browser storage is unavailable.
   try {
-    localStorage.setItem(key, JSON.stringify(dates));
+    localStorage.setItem(key(), JSON.stringify(dates));
   } catch {}
 }
 export const ritualDates = writable<Dates>(read());
+syncContext.subscribe((context) => {
+  if (!context) {
+    ritualDates.set(read());
+    return;
+  }
+  const latest = (kind: string) =>
+    context.extras.rituals
+      .filter((row) => row.kind === kind)
+      .map((row) => row.date as string)
+      .sort()
+      .at(-1) || '';
+  ritualDates.set({
+    plannedDate: latest('plan'),
+    reviewedDate: latest('review'),
+  });
+});
 export const planOpen = writable(false);
 // On desktop the main process keeps the dismissal dates beside the
 // database, so its reminders skip a ritual already finished today. The plan
@@ -35,7 +53,9 @@ export async function loadRitualDates() {
   if (!window.to3mato) return;
   try {
     const remote = await window.to3mato.ritualDates();
-    const local = get(ritualDates);
+    const local = currentSync()
+      ? { plannedDate: '', reviewedDate: '' }
+      : get(ritualDates);
     const later = (a: string, b: string) => (valid(a) > valid(b) ? a : b);
     const merged = {
       plannedDate: later(local.plannedDate, remote.plannedDate),

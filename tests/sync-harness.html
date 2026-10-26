@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Sync test client</title>
+  </head>
+  <body>
+    <script type="module">
+      import { createClient } from '@supabase/supabase-js';
+      import { openBrowserRepository } from '/src/lib/sync/browser-repository.mjs';
+      import { createSyncEngine } from '/src/lib/sync/engine.mjs';
+      import { createSupabaseTransport } from '/src/lib/sync/transport.mjs';
+      import { emptyState } from '/src/lib/sync/protocol.mjs';
+      window.openSync = async (url, email = 'a@example.test') => {
+        const client = createClient(url, 'test', {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { data, error } = await client.auth.verifyOtp({
+          email,
+          token: '123456',
+          type: 'email',
+        });
+        if (error) throw error;
+        const repository = await openBrowserRepository(
+          data.user.id,
+          emptyState(),
+        );
+        const engine = createSyncEngine({
+          repository,
+          transport: createSupabaseTransport(client, data.user.id),
+        });
+        window.syncClient = { engine, repository, client };
+        await engine.enable();
+        await engine.syncNow();
+      };
+    </script>
+  </body>
+</html>

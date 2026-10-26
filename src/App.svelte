@@ -31,6 +31,7 @@
   import FocusLog from './components/FocusLog.svelte';
   import DeliveryNotice from './components/DeliveryNotice.svelte';
   import EstimatePicker from './components/EstimatePicker.svelte';
+  import Onboarding from './components/Onboarding.svelte';
   let batchDialog: {
     open: (
       id: string,
@@ -91,7 +92,6 @@
   onMount(() => {
     let disposed = false,
       cleanup: (() => void) | undefined;
-    void loadRitualDates();
     const stopRitual = window.to3mato?.onRitual((kind) => {
       if (kind === 'plan') {
         tab = 'todo';
@@ -101,7 +101,10 @@
     });
     initialize().then((fn) => {
       if (disposed) fn();
-      else cleanup = fn;
+      else {
+        cleanup = fn;
+        void loadRitualDates();
+      }
     });
     return () => {
       disposed = true;
@@ -435,3 +438,4 @@
 {#if $ready}<CaptureMoment /><DeliveryNotice
     onopen={() => (tab = 'log')}
   />{/if}
+<Onboarding />

@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store';
 import { send, notify, isDesktop } from './client';
+import { dataScope } from './sync-context';
+import { mediaRevision } from './media-sync';
 
 // Desktop copies the chosen file into the app data folder and the project
 // keeps its file name. The browser preview keeps a data URL in IndexedDB
@@ -15,6 +17,7 @@ const TYPES: Record<string, string> = {
 };
 /** Bumps whenever an image changes so covers reload. */
 export const imageRevision = writable(0);
+mediaRevision.subscribe(() => imageRevision.update((n) => n + 1));
 const cache = new Map<string, string>();
 
 function openDatabase() {
@@ -75,7 +78,8 @@ function readFileAsDataUrl(file: File) {
 /** Resolve a project's image to a data URL, or '' when it has none. */
 export async function loadProjectImage(name: string): Promise<string> {
   if (!name) return '';
-  const cached = cache.get(name);
+  const cacheKey = `${dataScope()}:${name}`;
+  const cached = cache.get(cacheKey);
   if (cached !== undefined) return cached;
   let url = '';
   try {
@@ -85,7 +89,7 @@ export async function loadProjectImage(name: string): Promise<string> {
   } catch {
     url = '';
   }
-  cache.set(name, url);
+  if (url) cache.set(cacheKey, url);
   return url;
 }
 
@@ -139,7 +143,7 @@ async function saveImage(projectId: string, projectName: string, name: string) {
       image: name,
     })
   ) {
-    cache.delete(name);
+    cache.delete(`${dataScope()}:${name}`);
     imageRevision.update((n) => n + 1);
   }
 }

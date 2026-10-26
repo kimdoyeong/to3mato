@@ -9,12 +9,16 @@ import {
   Menu,
   Notification,
   autoUpdater as nativeUpdater,
+  safeStorage,
 } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SQLiteStore } from './storage.mjs';
+import { createAccountSync } from './sync.mjs';
+import { createOnboarding, onboardingMode } from './onboarding.mjs';
+import { setCalendarTimeZone } from '../src/lib/calendar-time.mjs';
 import { createTimerTray } from './tray.mjs';
 import {
   createUpdater,
@@ -53,7 +57,7 @@ protocol.registerSchemesAsPrivileged([
 const dev = process.env.TO3MATO_DEV_URL;
 if (dev && new URL(dev).origin !== 'http://127.0.0.1:4173')
   throw new Error('Invalid development URL');
-let window, store, state, ticker, updater;
+let window, store, state, ticker, updater, account, onboarding;
 let quitting = false;
 export let timerTray;
 if (!app.requestSingleInstanceLock()) {
@@ -69,6 +73,14 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(async () => {
+      // Read before the store creates the file: an existing database means an
+      // upgrade, which skips the first-run walkthrough.
+      onboarding = createOnboarding(app.getPath('userData'), {
+        mode: onboardingMode(),
+        existing: fs.existsSync(
+          path.join(app.getPath('userData'), 'to3mato.sqlite3'),
+        ),
+      });
       try {
         store = new SQLiteStore(app.getPath('userData'));
         state = store.load();
@@ -223,6 +235,7 @@ if (!app.requestSingleInstanceLock()) {
           return state;
         };
         const dispatch = (command) => {
+          if (account?.active()) return account.dispatch(command);
           const now = Date.now();
           const completion = completedTimerNotification(state, now);
           const next = applyCommand(state, command, now);
@@ -270,7 +283,7 @@ if (!app.requestSingleInstanceLock()) {
           trusted(event, true);
           showMain();
         });
-        ipcMain.handle('state:command', (event, command) => {
+        ipcMain.handle('state:command', async (event, command) => {
           trusted(event, true);
           if (
             event.sender === timerTray?.popover.webContents &&
@@ -283,7 +296,7 @@ if (!app.requestSingleInstanceLock()) {
           )
             throw new Error('Unauthorized tray command');
           try {
-            return dispatch(command);
+            return await dispatch(command);
           } catch (error) {
             throw new Error(error.message);
           }
@@ -296,8 +309,12 @@ if (!app.requestSingleInstanceLock()) {
           });
           if (canceled || !filePath) return false;
           const snapshot = structuredClone(state);
+          delete snapshot.syncContext;
           if (snapshot.timer) {
-            snapshot.timer.elapsed = elapsedSeconds(snapshot.timer);
+            snapshot.timer.elapsed = elapsedSeconds(
+              snapshot.timer,
+              account?.now() || Date.now(),
+            );
             snapshot.timer.running = false;
           }
           fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2));
@@ -326,10 +343,11 @@ if (!app.requestSingleInstanceLock()) {
         });
         // Project cover images live beside the database and are read back
         // as data URLs so the renderer's CSP (img-src data:) stays unchanged.
-        const imageDirectory = path.join(
-          app.getPath('userData'),
-          'project-images',
-        );
+        const imagesDirectory = () =>
+          path.join(
+            account?.directory() || app.getPath('userData'),
+            'project-images',
+          );
         const IMAGE_NAME = /^[A-Za-z0-9_-]{1,100}\.(png|jpe?g|webp|gif)$/;
         const IMAGE_TYPES = {
           png: 'image/png',
@@ -340,6 +358,7 @@ if (!app.requestSingleInstanceLock()) {
         };
         ipcMain.handle('image:pick', async (event) => {
           trusted(event);
+          const imageDirectory = imagesDirectory();
           const result = await dialog.showOpenDialog(window, {
             properties: ['openFile'],
             filters: [
@@ -363,6 +382,7 @@ if (!app.requestSingleInstanceLock()) {
         });
         ipcMain.handle('image:read', async (event, file) => {
           trusted(event);
+          const imageDirectory = imagesDirectory();
           if (typeof file !== 'string' || !IMAGE_NAME.test(file)) return '';
           const target = path.join(imageDirectory, file);
           if (!target.startsWith(imageDirectory + path.sep)) return '';
@@ -371,6 +391,11 @@ if (!app.requestSingleInstanceLock()) {
             const type = IMAGE_TYPES[path.extname(file).slice(1).toLowerCase()];
             return `data:${type};base64,${bytes.toString('base64')}`;
           } catch {
+            if (account?.active()) {
+              const asset = await account.assetRead(file);
+              if (asset)
+                return `data:${asset.mime};base64,${Buffer.from(asset.bytes).toString('base64')}`;
+            }
             return '';
           }
         });
@@ -388,6 +413,7 @@ if (!app.requestSingleInstanceLock()) {
             JSON.parse(fs.readFileSync(file, 'utf8')),
           );
           if (imported.timer) imported.timer.running = false;
+          if (account?.active()) return account.importData(imported);
           const confirmation = await dialog.showMessageBox(window, {
             type: 'question',
             buttons: ['취소', '가져오기'],
@@ -400,32 +426,69 @@ if (!app.requestSingleInstanceLock()) {
           if (confirmation.response !== 1) return null;
           return commit(imported, true);
         });
+        ipcMain.handle('onboarding:status', (event) => {
+          trusted(event);
+          return onboarding.pending();
+        });
+        ipcMain.handle('onboarding:finish', (event) => {
+          trusted(event);
+          onboarding.finish();
+        });
         const rituals = createRitualLedger(app.getPath('userData'));
         ipcMain.handle('ritual:dates', (event) => {
           trusted(event);
+          if (account?.active()) {
+            const rows = account.state().syncContext.extras.rituals;
+            const latest = (kind) =>
+              rows
+                .filter((row) => row.kind === kind)
+                .map((row) => row.date)
+                .sort()
+                .at(-1) || '';
+            return {
+              plannedDate: latest('plan'),
+              reviewedDate: latest('review'),
+            };
+          }
           const { done } = rituals.get();
           return { plannedDate: done.plan, reviewedDate: done.review };
         });
-        ipcMain.handle('ritual:finish', (event, kind, date) => {
+        ipcMain.handle('ritual:finish', async (event, kind, date) => {
           trusted(event);
           if (!isRitualKind(kind) || !isRitualDate(date)) return false;
+          if (account?.active()) {
+            await account.extra('rituals', `${date}:${kind}`, { kind, date });
+            return true;
+          }
           return rituals.markDone(kind, date);
         });
         let reminderMinute = -1;
         ticker = setInterval(() => {
-          const now = Date.now();
+          const now = account?.now() || Date.now();
           const minute = Math.floor(now / 60000);
           if (minute !== reminderMinute) {
             reminderMinute = minute;
-            const { reminder, settled } = nextReminder(
-              state,
-              now,
-              rituals.get(),
-            );
+            const ledger = rituals.get();
+            if (account?.active()) {
+              const rows = account.state().syncContext.extras.rituals;
+              for (const kind of ['plan', 'review'])
+                ledger.done[kind] =
+                  rows
+                    .filter((row) => row.kind === kind)
+                    .map((row) => row.date)
+                    .sort()
+                    .at(-1) || '';
+            }
+            const { reminder, settled } = nextReminder(state, now, ledger);
             if (reminder) {
               rituals.markSent(settled, localDate(new Date(now)));
               notifications.show(reminder);
             }
+          }
+          if (account?.active()) {
+            void account.tick().catch(report);
+            timerTray?.update();
+            return;
           }
           const completion = completedTimerNotification(state, now);
           const next = structuredClone(state);
@@ -442,12 +505,129 @@ if (!app.requestSingleInstanceLock()) {
           timerTray?.update();
         }, 250);
         powerMonitor.on('suspend', () => {
+          if (account?.active()) return;
           try {
             commit(applyCommand(state, { type: 'timer:pause' }));
           } catch (error) {
             report(error);
           }
         });
+        powerMonitor.on('resume', () => account?.resume());
+        let bundledSync = {};
+        const syncConfigFile = path.join(root, 'electron/supabase-config.json');
+        if (fs.existsSync(syncConfigFile)) {
+          try {
+            bundledSync = JSON.parse(fs.readFileSync(syncConfigFile, 'utf8'));
+          } catch {
+            // Broken optional configuration must not prevent local use.
+            bundledSync = { url: 'invalid' };
+          }
+        }
+        account = createAccountSync({
+          directory: app.getPath('userData'),
+          safeStorage,
+          bundled: bundledSync,
+          getLocalState: () => store.load(),
+          onState: (next) => {
+            const previous = state;
+            setCalendarTimeZone(next.syncContext?.timeZone);
+            state = next;
+            broadcast();
+            timerTray?.update();
+            if (
+              next.syncContext?.controller === next.syncContext?.deviceId &&
+              next.syncContext?.owner
+            ) {
+              const added = next.records.some(
+                (record) =>
+                  !previous.records.some((old) => old.id === record.id),
+              );
+              if (added)
+                notifications.show(
+                  completedTimerNotification(previous, account.now()),
+                );
+              notifications.show(
+                startedTimerNotification(previous, next, account.now()),
+              );
+            }
+          },
+          onStatus: (value) =>
+            window?.webContents.send('account:status', value),
+        });
+        const accountMethods = {
+          status: () => account.status(),
+          requestCode: (email, mode) => account.requestCode(email, mode),
+          verify: (email, code) => account.verify(email, code),
+          enable: () => {
+            store.snapshot(
+              path.join(app.getPath('userData'), 'to3mato.pre-sync.sqlite3'),
+              false,
+            );
+            return account.enable();
+          },
+          disable: () => account.disable(),
+          mediaAdopted: () => account.mediaAdopted(),
+          logout: () => account.logout(),
+          now: () => account.syncNow(),
+          resolve: (id, action) => account.resolve(id, action),
+          remove: async () => {
+            const result = await dialog.showMessageBox(window, {
+              type: 'warning',
+              buttons: ['취소', '삭제'],
+              defaultId: 0,
+              cancelId: 0,
+              message:
+                '서버에 저장된 계정, 동기화 데이터와 파일을 삭제합니다. 이 기기에 저장된 데이터는 남습니다.',
+            });
+            return result.response === 1 ? account.remove() : account.status();
+          },
+        };
+        for (const [method, handler] of Object.entries(accountMethods))
+          ipcMain.handle(`account:${method}`, (event, ...args) => {
+            trusted(event);
+            return handler(...args);
+          });
+        const checkOwner = (owner) => {
+          if (owner !== undefined && owner !== account.status().scope)
+            throw new Error('계정이 변경되었습니다.');
+        };
+        ipcMain.handle(
+          'sync:extra',
+          (event, entity, id, fields, deleted, owner) => {
+            trusted(event);
+            checkOwner(owner);
+            if (
+              !account.active() ||
+              !['rituals', 'clips', 'deliveries', 'assets'].includes(entity) ||
+              typeof deleted !== 'boolean' ||
+              JSON.stringify(fields).length > 16384
+            )
+              throw new Error('잘못된 동기화 요청입니다.');
+            return account.extra(entity, id, fields, deleted);
+          },
+        );
+        ipcMain.handle('sync:asset-put', (event, id, mime, bytes, owner) => {
+          trusted(event);
+          checkOwner(owner);
+          if (
+            !account.active() ||
+            !(bytes instanceof ArrayBuffer) ||
+            bytes.byteLength > 512 * 1024 * 1024
+          )
+            throw new Error('잘못된 파일입니다.');
+          return account.assetPut(id, mime, bytes);
+        });
+        ipcMain.handle('sync:asset-read', (event, id, owner) => {
+          trusted(event);
+          checkOwner(owner);
+          if (!account.active()) return null;
+          return account.assetRead(id);
+        });
+        ipcMain.handle('sync:project-images', (event) => {
+          trusted(event);
+          return account.importProjectImages();
+        });
+        await account.restore();
         Menu.setApplicationMenu(
           Menu.buildFromTemplate([
             ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
@@ -476,6 +656,7 @@ if (!app.requestSingleInstanceLock()) {
             onStatus: (status) =>
               window?.webContents.send('update:status', status),
             prepareInstall: () => {
+              if (account?.active()) return;
               try {
                 commit(applyCommand(state, { type: 'timer:pause' }));
               } catch (error) {
@@ -502,7 +683,9 @@ if (!app.requestSingleInstanceLock()) {
           timerTray?.destroy();
           notifications.destroy();
           try {
-            store.save(applyCommand(state, { type: 'timer:pause' }));
+            if (!account?.active())
+              store.save(applyCommand(state, { type: 'timer:pause' }));
+            account?.destroy();
           } catch (error) {
             console.error(error);
           } finally {
@@ -518,6 +701,7 @@ if (!app.requestSingleInstanceLock()) {
         if (quitting || !window) return;
         timerTray = createTimerTray({
           getState: () => state,
+          getNow: () => account?.now() || Date.now(),
           onError: report,
           showMain,
           dev,
