@@ -20,6 +20,15 @@
     more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
     book: '<path d="M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
     cup: '<path d="M5 6h12v9a5 5 0 0 1-10 0V6m10 2h2a3 3 0 0 1 0 6h-2M3 22h18M9 1v2m5-2v2"/>',
+    grip: '<circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.6" fill="currentColor" stroke="none"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    close: '<path d="m6 6 12 12M18 6 6 18"/>',
+    pencil: '<path d="m4 20 4-1 11-11-3-3L5 16Z"/><path d="m14 7 3 3"/>',
+    star: '<path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8Z" fill="#f6dc92" stroke="#d9a84a" stroke-width="1.3" stroke-linejoin="round"/>',
+    heart:
+      '<path d="M12 20.5S4 15.5 4 9.9A4 4 0 0 1 12 8a4 4 0 0 1 8 1.9c0 5.6-8 10.6-8 10.6Z"/>',
+    prev: '<path d="m15 6-6 6 6 6"/>',
+    next: '<path d="m9 6 6 6-6 6"/>',
   };
   let { name }: { name: string } = $props();
 </script>
