@@ -2,11 +2,20 @@ export type Task = {
   id: string;
   title: string;
   estimate: number;
+  remaining: number;
+  followUpOf: string;
   project: string;
   date: string;
   done: boolean;
 };
-export type Project = { id: string; name: string; icon: string; color: string };
+export type Project = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  outcome: string;
+  image: string;
+};
 export type FocusRecord = {
   id: string;
   taskId: string;
@@ -15,24 +24,49 @@ export type FocusRecord = {
   duration: number;
   at: number;
 };
+export type TicketSticker = '' | 'star' | 'heart' | 'leaf';
+export type Ticket = {
+  id: string;
+  taskId: string;
+  title: string;
+  projectId: string;
+  completedAt: number;
+  estimate: number;
+  used: number;
+  clipId: string;
+  note: string;
+  highlight: boolean;
+  sticker: TicketSticker;
+  voided: boolean;
+};
+export type TemplateStep = { title: string; estimate: number };
+export type Template = { id: string; name: string; steps: TemplateStep[] };
+export type TimerPhase = 'focus' | 'checkin' | 'rest';
 export type Timer = {
   taskId: string | null;
   duration: number;
   elapsed: number;
   startedAt: number;
   running: boolean;
-  phase: 'focus' | 'rest';
+  phase: TimerPhase;
+};
+export type Settings = {
+  focus: number;
+  rest: number;
+  trayDisplay: 'clock' | 'bar' | 'ring' | 'hourglass';
+  dailyCapacity: number;
+  planAt: string;
+  reviewAt: string;
+  remindDays: number[];
 };
 export type AppState = {
   version: 1;
-  settings: {
-    focus: number;
-    rest: number;
-    trayDisplay: 'clock' | 'bar' | 'ring' | 'hourglass';
-  };
+  settings: Settings;
   projects: Project[];
   tasks: Task[];
   records: FocusRecord[];
+  tickets: Ticket[];
+  templates: Template[];
   timer: Timer | null;
 };
 export type Command = { type: string; payload?: Record<string, unknown> };

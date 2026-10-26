@@ -54,6 +54,8 @@ CREATE TABLE changes (
   entity TEXT NOT NULL CHECK(entity IN ('project','task','record','settings')),
   id TEXT NOT NULL, data TEXT, hlc TEXT NOT NULL        -- data: 행 JSON. 삭제면 NULL
 ) STRICT;
+-- 로컬 스키마 v4(2026-10-26)부터 entity에 'ticket', 'template'이 추가된다.
+-- 서버의 changes.entity CHECK도 같은 값을 허용해야 푸시가 23514로 거부되지 않는다.
 CREATE TABLE sync_state (
   id INTEGER PRIMARY KEY CHECK(id = 1),
   device_id TEXT NOT NULL,

@@ -61,17 +61,17 @@ test('project deletion detaches tasks and preserves records and the running time
   );
 });
 
-test('new estimates stop at six while legacy estimates can be loaded and retained', () => {
+test('new estimates stop at two while legacy estimates can be loaded and retained', () => {
   const state = createInitialState();
   const task = { title: '새 작업', date: '', project: '' };
-  assert.equal(
-    applyCommand(state, {
-      type: 'task:save',
-      payload: { ...task, estimate: 6 },
-    }).tasks.at(-1).estimate,
-    6,
-  );
-  for (const estimate of [0, 1.5, 7, 48]) {
+  const saved = applyCommand(state, {
+    type: 'task:save',
+    payload: { ...task, estimate: 2 },
+  }).tasks.at(-1);
+  assert.equal(saved.estimate, 2);
+  assert.equal(saved.remaining, 2);
+  assert.equal(saved.followUpOf, '');
+  for (const estimate of [0, 1.5, 3, 7, 48]) {
     assert.throws(() =>
       applyCommand(state, {
         type: 'task:save',
@@ -86,12 +86,14 @@ test('new estimates stop at six while legacy estimates can be loaded and retaine
     );
   }
   state.tasks[0].estimate = 48;
+  state.tasks[0].remaining = 48;
   const loaded = normalizeState(state);
   const updated = applyCommand(loaded, {
     type: 'task:save',
     payload: { ...loaded.tasks[0], title: '기존 작업 수정' },
   });
   assert.equal(updated.tasks[0].estimate, 48);
+  assert.equal(updated.tasks[0].remaining, 48);
   assert.throws(() =>
     applyCommand(updated, {
       type: 'task:save',
@@ -100,13 +102,26 @@ test('new estimates stop at six while legacy estimates can be loaded and retaine
   );
   const reduced = applyCommand(updated, {
     type: 'task:save',
-    payload: { ...updated.tasks[0], estimate: 6 },
+    payload: { ...updated.tasks[0], estimate: 2, remaining: undefined },
   });
-  assert.equal(reduced.tasks[0].estimate, 6);
+  assert.equal(reduced.tasks[0].estimate, 2);
+  // The remaining estimate follows a changed estimate unless given.
+  assert.equal(reduced.tasks[0].remaining, 2);
   assert.throws(() =>
     applyCommand(reduced, {
       type: 'task:save',
       payload: { ...reduced.tasks[0], estimate: 48 },
+    }),
+  );
+  const kept = applyCommand(reduced, {
+    type: 'task:save',
+    payload: { ...reduced.tasks[0], remaining: 1 },
+  });
+  assert.equal(kept.tasks[0].remaining, 1);
+  assert.throws(() =>
+    applyCommand(kept, {
+      type: 'task:save',
+      payload: { ...kept.tasks[0], remaining: -1 },
     }),
   );
 });
@@ -154,9 +169,15 @@ test('timer completion records once and does not complete the task', () => {
   assert.equal(advanceTimer(s, 1600000), true);
   assert.equal(s.records.length, 1);
   assert.equal(s.records[0].seconds, 1500);
+  // A finished focus waits for the check-in; rest starts from the user.
+  assert.equal(s.timer.phase, 'checkin');
+  assert.equal(s.timer.running, false);
+  assert.equal(s.timer.taskId, 't1');
+  assert.equal(s.tasks[0].done, false);
+  assert.equal(advanceTimer(s, 1650000), false);
+  s = applyCommand(s, { type: 'checkin:skip' }, 1600000);
   assert.equal(s.timer.phase, 'rest');
   assert.equal(s.timer.running, true);
-  assert.equal(s.tasks[0].done, false);
   assert.equal(advanceTimer(s, 1700000), false);
   assert.equal(elapsedSeconds(s.timer, 1700000), 100);
   assert.equal(advanceTimer(s, 1900000), true);
@@ -197,11 +218,20 @@ test('date sections keep undated, today, tomorrow, future and past tasks', () =>
     { id: 'p', date: '2026-12-01', done: true },
   ];
   const s = getTodoSections(tasks, '2026-12-31');
+  // Today first, then only dates that hold tasks, undated last.
   assert.deepEqual(
-    s.slice(0, 4).map((x) => x.label),
-    ['미지정', '오늘', '내일', '2027년 1월 2일'],
+    s.map((x) => x.label),
+    ['오늘', '내일', '2027년 3월 12일', '미지정'],
   );
-  assert.equal(s.flatMap((x) => x.tasks).length, tasks.length);
+  assert.equal(s.flatMap((x) => x.tasks).length, tasks.length - 1);
+  const open = getTodoSections(
+    [...tasks, { id: 'q', date: '2026-12-01', done: false }],
+    '2026-12-31',
+  );
+  assert.deepEqual(
+    open.map((x) => x.label),
+    ['오늘', '내일', '2027년 3월 12일', '12월 1일', '미지정'],
+  );
 });
 test('moving dates and editing retains history', () => {
   let s = createInitialState();
@@ -323,7 +353,15 @@ test('row validators accept valid rows and strip unknown fields', () => {
       position: 2,
       extra: true,
     }),
-    { id: 'p1', name: '독서', icon: 'leaf', color: '#ABCDEF', position: 2 },
+    {
+      id: 'p1',
+      name: '독서',
+      icon: 'leaf',
+      color: '#ABCDEF',
+      outcome: '',
+      image: '',
+      position: 2,
+    },
   );
   assert.deepEqual(
     validateProjectRow({
@@ -333,7 +371,15 @@ test('row validators accept valid rows and strip unknown fields', () => {
       color: 'red',
       position: 0,
     }),
-    { id: 'p1', name: 'a', icon: 'folder', color: '#84956c', position: 0 },
+    {
+      id: 'p1',
+      name: 'a',
+      icon: 'folder',
+      color: '#84956c',
+      outcome: '',
+      image: '',
+      position: 0,
+    },
   );
   assert.deepEqual(
     validateTaskRow({
@@ -352,6 +398,8 @@ test('row validators accept valid rows and strip unknown fields', () => {
       estimate: 3,
       project: 'missing-project',
       date: '2026-10-20',
+      remaining: 3,
+      followUpOf: '',
       done: true,
       position: 0,
     },
@@ -375,6 +423,10 @@ test('row validators accept valid rows and strip unknown fields', () => {
     focus: 1500,
     rest: 300,
     trayDisplay: 'clock',
+    dailyCapacity: 8,
+    planAt: '',
+    reviewAt: '',
+    remindDays: [1, 2, 3, 4, 5],
   });
 });
 test('row validators reject out-of-range values', () => {

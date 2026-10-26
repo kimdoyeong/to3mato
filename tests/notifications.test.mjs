@@ -50,8 +50,10 @@ test('focus start, task switch, resume and rest start notify only on a running t
     },
   );
   advanceTimer(state, 1808000);
+  assert.equal(state.timer.phase, 'checkin');
   assert.equal(dispatch({ type: 'timer:pause' }, 1808500), null);
-  assert.deepEqual(dispatch({ type: 'timer:toggle' }, 1809000), {
+  assert.equal(dispatch({ type: 'timer:toggle' }, 1808600), null);
+  assert.deepEqual(dispatch({ type: 'checkin:skip' }, 1809000), {
     title: '휴식 시작',
     body: '',
   });
@@ -91,7 +93,17 @@ test('only natural focus/rest completion produces a notification, once per trans
     body: '프로젝트 아이디어 정리 · 1포모도로 완료. 휴식 시간입니다',
   });
   advanceTimer(state, 1501000);
-  assert.equal(state.timer.running, true);
+  // The check-in waits for the user and never completes on its own.
+  assert.equal(state.timer.phase, 'checkin');
+  assert.equal(state.timer.running, false);
+  assert.equal(completedTimerNotification(state, 1800999), null);
+  assert.equal(completedTimerNotification(state, 9999999), null);
+  state = applyCommand(
+    state,
+    { type: 'checkin:save', payload: { remaining: 1 } },
+    1501000,
+  );
+  assert.equal(state.timer.phase, 'rest');
   assert.equal(completedTimerNotification(state, 1800999), null);
   assert.equal(completedTimerNotification(state, 1801000).title, '휴식 끝');
   advanceTimer(state, 1801000);
@@ -182,7 +194,7 @@ test('native notification clicks restore the window and delivery failures do not
   assert.equal(sent[2].listenerCount('click'), 0);
 });
 
-test('an unrelated command at focus expiry starts rest without a duplicate start notice', () => {
+test('an unrelated command at focus expiry leaves a paused check-in without a start notice', () => {
   const state = applyCommand(
     createInitialState(),
     { type: 'timer:play', payload: { id: 't1' } },
@@ -197,8 +209,16 @@ test('an unrelated command at focus expiry starts rest without a duplicate start
     completedTimerNotification(state, 1501000).title,
     '집중 타이머 끝',
   );
-  assert.equal(next.timer.phase, 'rest');
-  assert.equal(next.timer.running, true);
+  assert.equal(next.timer.phase, 'checkin');
+  assert.equal(next.timer.running, false);
   assert.equal(startedTimerNotification(state, next, 1501000), null);
   assert.equal(completedTimerNotification(next, 1501000), null);
+  // Finishing the check-in during a later dispatch announces rest once.
+  const rested = applyCommand(next, { type: 'checkin:done' }, 1502000);
+  assert.equal(completedTimerNotification(next, 1502000), null);
+  assert.deepEqual(startedTimerNotification(next, rested, 1502000), {
+    title: '휴식 시작',
+    body: '',
+  });
+  assert.equal(rested.tickets.length, 1);
 });

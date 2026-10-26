@@ -72,8 +72,21 @@ test('v1 database migrates to v2 with history, timer and a backup', (t) => {
     focus: 900,
     rest: 300,
     trayDisplay: 'clock',
+    dailyCapacity: 8,
+    planAt: '',
+    reviewAt: '',
+    remindDays: [1, 2, 3, 4, 5],
   });
   assert.equal(state.timer.taskId, 'b');
+  assert.deepEqual(
+    state.tasks.map((task) => [task.remaining, task.followUpOf]),
+    [
+      [2, ''],
+      [1, ''],
+    ],
+  );
+  assert.deepEqual(state.tickets, []);
+  assert.deepEqual(state.templates, []);
   // Identical legacy records stay separate.
   const base = legacyRecordId({
     taskId: 'deleted',
@@ -172,6 +185,10 @@ test('resetSync queues a snapshot and later changes are logged in order', (t) =>
     focus: 1500,
     rest: 300,
     trayDisplay: 'clock',
+    dailyCapacity: 8,
+    planAt: '',
+    reviewAt: '',
+    remindDays: [1, 2, 3, 4, 5],
   });
   assert.equal(store.syncState().logging, true);
   store.markPushed(snapshot.map((c) => c.seq));
@@ -297,10 +314,15 @@ test('remote changes apply by row with the later HLC winning', (t) => {
     loaded.tasks.some((task) => task.id === 't3'),
     false,
   );
+  // A settings payload from an older device still validates with defaults.
   assert.deepEqual(loaded.settings, {
     focus: 3000,
     rest: 600,
     trayDisplay: 'clock',
+    dailyCapacity: 8,
+    planAt: '',
+    reviewAt: '',
+    remindDays: [1, 2, 3, 4, 5],
   });
   assert.deepEqual(
     loaded.records.map((record) => record.id),

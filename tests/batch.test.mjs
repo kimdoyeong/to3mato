@@ -118,8 +118,10 @@ test('batch commit is atomic and results are ordinary independent tasks', () => 
     'date',
     'done',
     'estimate',
+    'followUpOf',
     'id',
     'project',
+    'remaining',
     'title',
   ]);
   assert.ok(added.every((task) => task.project === 'p1' && !task.done));

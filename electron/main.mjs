@@ -266,7 +266,12 @@ if (!app.requestSingleInstanceLock()) {
           trusted(event, true);
           if (
             event.sender === timerTray?.popover.webContents &&
-            !['timer:play', 'timer:toggle', 'timer:end'].includes(command?.type)
+            ![
+              'timer:play',
+              'timer:toggle',
+              'timer:end',
+              'checkin:skip',
+            ].includes(command?.type)
           )
             throw new Error('Unauthorized tray command');
           try {

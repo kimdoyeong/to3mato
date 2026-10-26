@@ -9,10 +9,12 @@ import {
   validateProjectRow,
   validateTaskRow,
   validateRecordRow,
+  validateTicketRow,
+  validateTemplateRow,
   validateSettings,
 } from '../src/lib/domain.mjs';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 const TOMBSTONE_DAYS = 30;
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -53,9 +55,8 @@ export const SCHEMA_V1 = `
   CREATE INDEX records_task_idx ON focus_records(task_id, at);
   CREATE INDEX records_date_idx ON focus_records(at);
 `;
-// Rows are never removed directly. `deleted = 1` keeps a tombstone so an older
-// synced copy cannot bring the row back. updated_at holds the row's HLC.
-const SCHEMA_V3 = `
+// Kept so tests can build real v2/v3 databases for migration coverage.
+export const SCHEMA_V3 = `
   CREATE TABLE projects (
     id TEXT PRIMARY KEY, position INTEGER NOT NULL,
     name TEXT NOT NULL, icon TEXT NOT NULL, color TEXT NOT NULL,
@@ -113,6 +114,105 @@ const SCHEMA_V3 = `
   CREATE INDEX records_task_idx ON focus_records(task_id, at);
   CREATE INDEX changes_row_idx ON changes(entity, id);
 `;
+// Rows are never removed directly. `deleted = 1` keeps a tombstone so an older
+// synced copy cannot bring the row back. updated_at holds the row's HLC.
+// Columns added in v4 come last so fresh and migrated tables match.
+const TICKETS_DDL = `
+  -- Issued when a task is completed. History: never removed by commands.
+  CREATE TABLE tickets (
+    id TEXT PRIMARY KEY, task_id TEXT NOT NULL, title TEXT NOT NULL,
+    project_id TEXT NOT NULL DEFAULT '', completed_at REAL NOT NULL,
+    estimate INTEGER NOT NULL CHECK(estimate BETWEEN 1 AND 48),
+    used REAL NOT NULL CHECK(used >= 0),
+    clip_id TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+    highlight INTEGER NOT NULL DEFAULT 0 CHECK(highlight IN (0,1)),
+    sticker TEXT NOT NULL DEFAULT '' CHECK(sticker IN ('','star','heart','leaf')),
+    voided INTEGER NOT NULL DEFAULT 0 CHECK(voided IN (0,1)),
+    updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0,1))
+  ) STRICT;
+  CREATE TABLE templates (
+    id TEXT PRIMARY KEY, position INTEGER NOT NULL, name TEXT NOT NULL,
+    steps TEXT NOT NULL,
+    updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0,1))
+  ) STRICT;
+  CREATE INDEX tickets_order_idx ON tickets(deleted, completed_at, id);
+  CREATE INDEX tickets_task_idx ON tickets(task_id, completed_at);
+  CREATE INDEX templates_order_idx ON templates(deleted, position, id);
+`;
+const TIMER_DDL_V4 = (name) => `
+  CREATE TABLE ${name} (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    task_id TEXT REFERENCES tasks(id) DEFERRABLE INITIALLY DEFERRED,
+    phase TEXT NOT NULL CHECK(phase IN ('focus','checkin','rest')),
+    duration REAL NOT NULL CHECK(duration > 0),
+    elapsed REAL NOT NULL CHECK(elapsed >= 0 AND elapsed <= duration),
+    started_at REAL NOT NULL, running INTEGER NOT NULL CHECK(running IN (0,1)),
+    CHECK((phase IN ('focus','checkin') AND task_id IS NOT NULL) OR (phase = 'rest' AND task_id IS NULL))
+  ) STRICT;
+`;
+const CHANGES_DDL_V4 = (name) => `
+  CREATE TABLE ${name} (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity TEXT NOT NULL CHECK(entity IN ('project','task','record','ticket','template','settings')),
+    id TEXT NOT NULL, data TEXT, hlc TEXT NOT NULL
+  ) STRICT;
+`;
+const SETTINGS_V4_COLUMNS = `
+  daily_capacity INTEGER NOT NULL DEFAULT 8 CHECK(daily_capacity BETWEEN 1 AND 16),
+  plan_at TEXT NOT NULL DEFAULT '' CHECK(plan_at = '' OR plan_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+  review_at TEXT NOT NULL DEFAULT '' CHECK(review_at = '' OR review_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+  remind_days TEXT NOT NULL DEFAULT '[1,2,3,4,5]'`;
+const SCHEMA_V4 = `
+  CREATE TABLE projects (
+    id TEXT PRIMARY KEY, position INTEGER NOT NULL,
+    name TEXT NOT NULL, icon TEXT NOT NULL, color TEXT NOT NULL,
+    updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0,1)),
+    outcome TEXT NOT NULL DEFAULT '', image TEXT NOT NULL DEFAULT ''
+  ) STRICT;
+  -- No foreign key to projects: a synced task can arrive before its project.
+  -- A task whose project is missing or deleted loads without a project.
+  CREATE TABLE tasks (
+    id TEXT PRIMARY KEY, position INTEGER NOT NULL, title TEXT NOT NULL,
+    estimate INTEGER NOT NULL CHECK(estimate BETWEEN 1 AND 48),
+    project_id TEXT, date TEXT NOT NULL, done INTEGER NOT NULL CHECK(done IN (0,1)),
+    updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0,1)),
+    remaining INTEGER NOT NULL DEFAULT 0 CHECK(remaining BETWEEN 0 AND 48),
+    follow_up_of TEXT NOT NULL DEFAULT ''
+  ) STRICT;
+  -- History intentionally keeps task_id even after a task has been deleted.
+  CREATE TABLE focus_records (
+    id TEXT PRIMARY KEY, task_id TEXT NOT NULL,
+    seconds REAL NOT NULL CHECK(seconds >= 0),
+    pomodoros REAL NOT NULL CHECK(pomodoros BETWEEN 0 AND 1),
+    duration REAL NOT NULL CHECK(duration > 0), at REAL NOT NULL,
+    updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0,1))
+  ) STRICT;
+  ${TICKETS_DDL}
+  CREATE TABLE settings (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    focus REAL NOT NULL CHECK(focus > 0), rest REAL NOT NULL CHECK(rest > 0),
+    updated_at TEXT NOT NULL,
+    tray_display TEXT NOT NULL DEFAULT 'clock' CHECK(tray_display IN ('clock','bar','ring','hourglass')),
+    ${SETTINGS_V4_COLUMNS}
+  ) STRICT;
+  ${TIMER_DDL_V4('timer')}
+  -- Local changes waiting to be pushed. Written only while sync is on.
+  ${CHANGES_DDL_V4('changes')}
+  CREATE TABLE sync_state (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    device_id TEXT NOT NULL,
+    logging INTEGER NOT NULL DEFAULT 0 CHECK(logging IN (0,1)),
+    cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor >= 0),
+    last_sync_at REAL
+  ) STRICT;
+  CREATE INDEX projects_order_idx ON projects(deleted, position, id);
+  CREATE INDEX tasks_order_idx ON tasks(deleted, position, id);
+  CREATE INDEX tasks_date_idx ON tasks(date, position);
+  CREATE INDEX tasks_project_idx ON tasks(project_id, position);
+  CREATE INDEX records_order_idx ON focus_records(deleted, at, id);
+  CREATE INDEX records_task_idx ON focus_records(task_id, at);
+  CREATE INDEX changes_row_idx ON changes(entity, id);
+`;
 
 // Hybrid logical clock: `${wall ms, 15 digits}-${counter, 4 digits}-${device}`.
 // String order equals time order, and the device suffix breaks ties.
@@ -131,23 +231,42 @@ export function parseHLC(value) {
 const ENTITIES = {
   project: {
     table: 'projects',
-    columns: ['position', 'name', 'icon', 'color'],
-    values: (row) => [row.position, row.name, row.icon, row.color],
-    select: 'id, name, icon, color, position',
+    columns: ['position', 'name', 'icon', 'color', 'outcome', 'image'],
+    values: (row) => [
+      row.position,
+      row.name,
+      row.icon,
+      row.color,
+      row.outcome,
+      row.image,
+    ],
+    select: 'id, name, icon, color, outcome, image, position',
     row: (r) => ({
       id: r.id,
       name: r.name,
       icon: r.icon,
       color: r.color,
+      outcome: r.outcome,
+      image: r.image,
       position: r.position,
     }),
-    placeholder: [0, '', 'folder', '#000000'],
+    placeholder: [0, '', 'folder', '#000000', '', ''],
     validate: validateProjectRow,
     ordered: true,
+    order: 'position, id',
   },
   task: {
     table: 'tasks',
-    columns: ['position', 'title', 'estimate', 'project_id', 'date', 'done'],
+    columns: [
+      'position',
+      'title',
+      'estimate',
+      'project_id',
+      'date',
+      'done',
+      'remaining',
+      'follow_up_of',
+    ],
     values: (row) => [
       row.position,
       row.title,
@@ -155,8 +274,11 @@ const ENTITIES = {
       row.project || null,
       row.date,
       Number(row.done),
+      row.remaining,
+      row.followUpOf,
     ],
-    select: 'id, title, estimate, project_id, date, done, position',
+    select:
+      'id, title, estimate, project_id, date, done, remaining, follow_up_of, position',
     row: (r) => ({
       id: r.id,
       title: r.title,
@@ -164,11 +286,14 @@ const ENTITIES = {
       project: r.project_id ?? '',
       date: r.date,
       done: !!r.done,
+      remaining: r.remaining,
+      followUpOf: r.follow_up_of,
       position: r.position,
     }),
-    placeholder: [0, '', 1, null, '', 0],
+    placeholder: [0, '', 1, null, '', 0, 0, ''],
     validate: validateTaskRow,
     ordered: true,
+    order: 'position, id',
   },
   record: {
     table: 'focus_records',
@@ -192,9 +317,103 @@ const ENTITIES = {
     placeholder: ['', 0, 0, 1, 0],
     validate: validateRecordRow,
     ordered: false,
+    order: 'at, id',
+  },
+  ticket: {
+    table: 'tickets',
+    columns: [
+      'task_id',
+      'title',
+      'project_id',
+      'completed_at',
+      'estimate',
+      'used',
+      'clip_id',
+      'note',
+      'highlight',
+      'sticker',
+      'voided',
+    ],
+    values: (row) => [
+      row.taskId,
+      row.title,
+      row.projectId,
+      row.completedAt,
+      row.estimate,
+      row.used,
+      row.clipId,
+      row.note,
+      Number(row.highlight),
+      row.sticker,
+      Number(row.voided),
+    ],
+    select:
+      'id, task_id, title, project_id, completed_at, estimate, used, clip_id, note, highlight, sticker, voided',
+    row: (r) => ({
+      id: r.id,
+      taskId: r.task_id,
+      title: r.title,
+      projectId: r.project_id,
+      completedAt: r.completed_at,
+      estimate: r.estimate,
+      used: r.used,
+      clipId: r.clip_id,
+      note: r.note,
+      highlight: !!r.highlight,
+      sticker: r.sticker,
+      voided: !!r.voided,
+    }),
+    placeholder: ['', '', '', 0, 1, 0, '', '', 0, '', 0],
+    validate: validateTicketRow,
+    ordered: false,
+    order: 'completed_at, id',
+  },
+  template: {
+    table: 'templates',
+    columns: ['position', 'name', 'steps'],
+    values: (row) => [row.position, row.name, JSON.stringify(row.steps)],
+    select: 'id, name, steps, position',
+    row: (r) => ({
+      id: r.id,
+      name: r.name,
+      steps: JSON.parse(r.steps),
+      position: r.position,
+    }),
+    placeholder: [0, '', '[]'],
+    validate: validateTemplateRow,
+    ordered: true,
+    order: 'position, id',
   },
 };
-const ENTITY_ORDER = { project: 0, task: 1, record: 2, settings: 3 };
+const ENTITY_ORDER = {
+  project: 0,
+  task: 1,
+  record: 2,
+  ticket: 3,
+  template: 4,
+  settings: 5,
+};
+const settingsPayload = (s) => ({
+  focus: s.focus,
+  rest: s.rest,
+  trayDisplay: s.trayDisplay,
+  dailyCapacity: s.dailyCapacity,
+  planAt: s.planAt,
+  reviewAt: s.reviewAt,
+  remindDays: s.remindDays,
+});
+const settingsRow = (r) =>
+  r && {
+    focus: r.focus,
+    rest: r.rest,
+    trayDisplay: r.trayDisplay,
+    dailyCapacity: r.dailyCapacity,
+    planAt: r.planAt,
+    reviewAt: r.reviewAt,
+    remindDays: JSON.parse(r.remindDays),
+  };
+const SETTINGS_SELECT =
+  'focus, rest, tray_display AS trayDisplay, daily_capacity AS dailyCapacity, plan_at AS planAt, review_at AS reviewAt, remind_days AS remindDays';
 const SETTINGS_ID = 'settings';
 
 function stateRows(state) {
@@ -204,6 +423,8 @@ function stateRows(state) {
       name: project.name,
       icon: project.icon,
       color: project.color,
+      outcome: project.outcome,
+      image: project.image,
       position,
     })),
     task: (state?.tasks ?? []).map((task, position) => ({
@@ -213,6 +434,8 @@ function stateRows(state) {
       project: task.project,
       date: task.date,
       done: task.done,
+      remaining: task.remaining,
+      followUpOf: task.followUpOf,
       position,
     })),
     record: (state?.records ?? []).map((record) => ({
@@ -222,6 +445,26 @@ function stateRows(state) {
       pomodoros: record.pomodoros,
       duration: record.duration,
       at: record.at,
+    })),
+    ticket: (state?.tickets ?? []).map((ticket) => ({
+      id: ticket.id,
+      taskId: ticket.taskId,
+      title: ticket.title,
+      projectId: ticket.projectId,
+      completedAt: ticket.completedAt,
+      estimate: ticket.estimate,
+      used: ticket.used,
+      clipId: ticket.clipId,
+      note: ticket.note,
+      highlight: ticket.highlight,
+      sticker: ticket.sticker,
+      voided: ticket.voided,
+    })),
+    template: (state?.templates ?? []).map((template, position) => ({
+      id: template.id,
+      name: template.name,
+      steps: template.steps,
+      position,
     })),
   };
 }
@@ -256,6 +499,7 @@ export class SQLiteStore {
     this.migrationBackup = path.join(directory, 'state.pre-sqlite.json');
     this.importBackup = path.join(directory, 'to3mato.pre-import.sqlite3');
     this.v2Backup = path.join(directory, 'to3mato.pre-v2.sqlite3');
+    this.v4Backup = path.join(directory, 'to3mato.pre-v4.sqlite3');
     this.now = now;
     this.db = null;
     this.previous = null;
@@ -304,11 +548,14 @@ export class SQLiteStore {
         const version = this.db
           .prepare('PRAGMA user_version')
           .get().user_version;
-        if (![0, 1, 2, SCHEMA_VERSION].includes(version))
+        if (![0, 1, 2, 3, SCHEMA_VERSION].includes(version))
           throw new Error(`지원하지 않는 DB 버전입니다: ${version}`);
         if (version === 0) this.create();
         else if (version === 1) this.migrateV1();
-        else if (version === 2) this.migrateV2();
+        else {
+          if (version === 2) this.migrateV2();
+          if (version <= 3) this.migrateV3();
+        }
         this.db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;');
         this.openSyncState();
         this.transaction(() => this.removeOldTombstones());
@@ -348,7 +595,7 @@ export class SQLiteStore {
       );
     }
     this.transaction(() => {
-      this.db.exec(SCHEMA_V3);
+      this.db.exec(SCHEMA_V4);
       this.initSyncState();
       this.writeChanges(initial, null);
       this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -363,7 +610,42 @@ export class SQLiteStore {
       this.db.exec(
         "ALTER TABLE settings ADD COLUMN tray_display TEXT NOT NULL DEFAULT 'clock' CHECK(tray_display IN ('clock','bar','ring','hourglass'))",
       );
-      this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+      this.db.exec('PRAGMA user_version = 3');
+    });
+  }
+  /**
+   * v3 → v4: estimate cap, remaining estimate, project outcome/image,
+   * tickets, templates, reminder settings and the check-in timer phase.
+   * CHECK constraints cannot be altered, so timer and changes are rebuilt.
+   */
+  migrateV3() {
+    this.snapshot(this.v4Backup, false);
+    this.transaction(() => {
+      this.db.exec(`
+        ALTER TABLE projects ADD COLUMN outcome TEXT NOT NULL DEFAULT '';
+        ALTER TABLE projects ADD COLUMN image TEXT NOT NULL DEFAULT '';
+        ALTER TABLE tasks ADD COLUMN remaining INTEGER NOT NULL DEFAULT 0 CHECK(remaining BETWEEN 0 AND 48);
+        ALTER TABLE tasks ADD COLUMN follow_up_of TEXT NOT NULL DEFAULT '';
+        UPDATE tasks SET remaining = estimate;
+        ${SETTINGS_V4_COLUMNS.trim()
+          .split(',\n')
+          .map((column) => `ALTER TABLE settings ADD COLUMN ${column.trim()};`)
+          .join('\n')}
+        ${TICKETS_DDL}
+        ${TIMER_DDL_V4('timer_v4')}
+        INSERT INTO timer_v4 (id, task_id, phase, duration, elapsed, started_at, running)
+          SELECT id, task_id, phase, duration, elapsed, started_at, running FROM timer;
+        DROP TABLE timer;
+        ALTER TABLE timer_v4 RENAME TO timer;
+        ${CHANGES_DDL_V4('changes_v4')}
+        INSERT INTO changes_v4 (seq, entity, id, data, hlc)
+          SELECT seq, entity, id, data, hlc FROM changes;
+        DROP TABLE changes;
+        ALTER TABLE changes_v4 RENAME TO changes;
+        CREATE INDEX changes_row_idx ON changes(entity, id);
+        PRAGMA user_version = ${SCHEMA_VERSION};
+      `);
+      this.statements.clear();
     });
   }
   migrateV1() {
@@ -376,7 +658,7 @@ export class SQLiteStore {
         'DROP TABLE timer; DROP TABLE focus_records; DROP TABLE tasks; DROP TABLE settings; DROP TABLE projects;',
       );
       this.statements.clear();
-      this.db.exec(SCHEMA_V3);
+      this.db.exec(SCHEMA_V4);
       this.initSyncState();
       this.writeChanges(state, null);
       this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -427,11 +709,11 @@ export class SQLiteStore {
     if (this.db.prepare('PRAGMA foreign_key_check').all().length)
       throw new Error('데이터 참조 검사에 실패했습니다.');
     const projects = this.statement(
-      'SELECT id, name, icon, color FROM projects WHERE deleted = 0 ORDER BY position, id',
+      'SELECT id, name, icon, color, outcome, image FROM projects WHERE deleted = 0 ORDER BY position, id',
     ).all();
     const live = new Set(projects.map((project) => project.id));
     const tasks = this.statement(
-      'SELECT id, title, estimate, project_id, date, done FROM tasks WHERE deleted = 0 ORDER BY position, id',
+      'SELECT id, title, estimate, project_id, date, done, remaining, follow_up_of AS followUpOf FROM tasks WHERE deleted = 0 ORDER BY position, id',
     )
       .all()
       .map(({ project_id, done, ...task }) => ({
@@ -442,14 +724,32 @@ export class SQLiteStore {
     const records = this.statement(
       'SELECT id, task_id AS taskId, seconds, pomodoros, duration, at FROM focus_records WHERE deleted = 0 ORDER BY at, id',
     ).all();
-    const settings = this.statement(
-      'SELECT focus, rest, tray_display AS trayDisplay FROM settings WHERE id = 1',
-    ).get();
+    const tickets = this.statement(
+      'SELECT id, task_id AS taskId, title, project_id AS projectId, completed_at AS completedAt, estimate, used, clip_id AS clipId, note, highlight, sticker, voided FROM tickets WHERE deleted = 0 ORDER BY completed_at, id',
+    )
+      .all()
+      .map((ticket) => ({
+        ...ticket,
+        highlight: !!ticket.highlight,
+        voided: !!ticket.voided,
+      }));
+    const templates = this.statement(
+      'SELECT id, name, steps FROM templates WHERE deleted = 0 ORDER BY position, id',
+    )
+      .all()
+      .map((template) => ({ ...template, steps: JSON.parse(template.steps) }));
+    const settings = settingsRow(
+      this.statement(
+        `SELECT ${SETTINGS_SELECT} FROM settings WHERE id = 1`,
+      ).get(),
+    );
     return normalizeState({
       version: 1,
       projects,
       tasks,
       records,
+      tickets,
+      templates,
       settings,
       timer: this.readTimer(),
     });
@@ -476,6 +776,8 @@ export class SQLiteStore {
           SELECT max(updated_at) AS value FROM projects
           UNION ALL SELECT max(updated_at) FROM tasks
           UNION ALL SELECT max(updated_at) FROM focus_records
+          UNION ALL SELECT max(updated_at) FROM tickets
+          UNION ALL SELECT max(updated_at) FROM templates
           UNION ALL SELECT max(updated_at) FROM settings
           UNION ALL SELECT max(hlc) FROM changes)`,
       )
@@ -542,19 +844,18 @@ export class SQLiteStore {
   }
   putSettings(settings, hlc, log = true) {
     this.statement(
-      'INSERT INTO settings (id, focus, rest, tray_display, updated_at) VALUES (1, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET focus=excluded.focus, rest=excluded.rest, tray_display=excluded.tray_display, updated_at=excluded.updated_at',
-    ).run(settings.focus, settings.rest, settings.trayDisplay ?? 'clock', hlc);
-    if (log)
-      this.log(
-        'settings',
-        SETTINGS_ID,
-        {
-          focus: settings.focus,
-          rest: settings.rest,
-          trayDisplay: settings.trayDisplay,
-        },
-        hlc,
-      );
+      'INSERT INTO settings (id, focus, rest, tray_display, daily_capacity, plan_at, review_at, remind_days, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET focus=excluded.focus, rest=excluded.rest, tray_display=excluded.tray_display, daily_capacity=excluded.daily_capacity, plan_at=excluded.plan_at, review_at=excluded.review_at, remind_days=excluded.remind_days, updated_at=excluded.updated_at',
+    ).run(
+      settings.focus,
+      settings.rest,
+      settings.trayDisplay,
+      settings.dailyCapacity,
+      settings.planAt,
+      settings.reviewAt,
+      JSON.stringify(settings.remindDays),
+      hlc,
+    );
+    if (log) this.log('settings', SETTINGS_ID, settingsPayload(settings), hlc);
   }
   readRow(entity, id) {
     const { table, select, row } = ENTITIES[entity];
@@ -670,7 +971,7 @@ export class SQLiteStore {
       // A remote delete or completion of the focused task settles the timer first,
       // like the local task:delete and task:toggle commands.
       const timer = this.previous.timer;
-      if (timer?.phase === 'focus') {
+      if (timer?.phase === 'focus' || timer?.phase === 'checkin') {
         const last = valid
           .filter((c) => c.entity === 'task' && c.id === timer.taskId)
           .at(-1);
@@ -762,24 +1063,21 @@ export class SQLiteStore {
         'UPDATE sync_state SET logging = 1, cursor = 0, last_sync_at = NULL WHERE id = 1',
       ).run();
       this.logging = true;
-      for (const [entity, { table, select, row }] of Object.entries(ENTITIES)) {
-        const order = ENTITIES[entity].ordered ? 'position, id' : 'at, id';
+      for (const [entity, { table, select, row, order }] of Object.entries(
+        ENTITIES,
+      )) {
         for (const r of this.statement(
           `SELECT ${select}, updated_at, deleted FROM ${table} ORDER BY deleted, ${order}`,
         ).all())
           this.log(entity, r.id, r.deleted ? null : row(r), r.updated_at);
       }
       const settings = this.statement(
-        'SELECT focus, rest, tray_display AS trayDisplay, updated_at FROM settings WHERE id = 1',
+        `SELECT ${SETTINGS_SELECT}, updated_at FROM settings WHERE id = 1`,
       ).get();
       this.log(
         'settings',
         SETTINGS_ID,
-        {
-          focus: settings.focus,
-          rest: settings.rest,
-          trayDisplay: settings.trayDisplay,
-        },
+        settingsPayload(settingsRow(settings)),
         settings.updated_at,
       );
     });

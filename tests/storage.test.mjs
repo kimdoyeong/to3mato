@@ -5,11 +5,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { SQLiteStore } from '../electron/storage.mjs';
+import {
+  SQLiteStore,
+  SCHEMA_V3,
+  SCHEMA_VERSION,
+  formatHLC,
+} from '../electron/storage.mjs';
 import {
   createInitialState,
   applyCommand,
   legacyRecordId,
+  normalizeState,
 } from '../src/lib/domain.mjs';
 
 function fixture(t) {
@@ -199,28 +205,217 @@ test('committed data survives process exit without a graceful close', (t) => {
   assert.equal(f.store().load().tasks[0].title, 'crash recovery');
 });
 
-test('v2 migration preserves state and sync metadata and persists tray display', (t) => {
+const DEVICE = '00000000-0000-4000-8000-000000000001';
+const hlc = (wall, counter = 0) => formatHLC(wall, counter, DEVICE);
+/** A real v3 database with history, a pending change log and a focus timer. */
+function createV3Database(file, { version = 3 } = {}) {
+  const db = new DatabaseSync(file);
+  db.exec(SCHEMA_V3);
+  db.exec(`
+    INSERT INTO projects VALUES ('p1', 0, '사이드 프로젝트', 'folder', '#d08c6f', '${hlc(1)}', 0);
+    INSERT INTO projects VALUES ('gone', 1, '지운 프로젝트', 'leaf', '#b49b65', '${hlc(2)}', 1);
+    INSERT INTO tasks VALUES ('big', 0, '예상 4짜리 기존 작업', 4, 'p1', '2026-10-20', 0, '${hlc(3)}', 0);
+    INSERT INTO tasks VALUES ('small', 1, '예상 1짜리 작업', 1, NULL, '', 0, '${hlc(4)}', 0);
+    INSERT INTO focus_records VALUES ('r1', 'big', 1500, 1, 1500, 100, '${hlc(5)}', 0);
+    INSERT INTO settings VALUES (1, 900, 300, '${hlc(6)}', 'ring');
+    INSERT INTO timer VALUES (1, 'big', 'focus', 900, 30, 50, 0);
+    INSERT INTO sync_state VALUES (1, '${DEVICE}', 1, 7, 123);
+    INSERT INTO changes (seq, entity, id, data, hlc) VALUES (3, 'task', 'small', '{"id":"small"}', '${hlc(4)}');
+    INSERT INTO changes (seq, entity, id, data, hlc) VALUES (9, 'project', 'gone', NULL, '${hlc(2)}');
+  `);
+  if (version === 2) db.exec('ALTER TABLE settings DROP COLUMN tray_display;');
+  db.exec(`PRAGMA user_version = ${version}`);
+  db.close();
+}
+function assertMigratedV3(f, store, state) {
+  assert.equal(
+    store.db.prepare('PRAGMA user_version').get().user_version,
+    SCHEMA_VERSION,
+  );
+  assert.equal(SCHEMA_VERSION, 4);
+  // Existing estimates above the new cap are kept; remaining starts equal.
+  assert.deepEqual(
+    state.tasks.map((task) => [
+      task.id,
+      task.estimate,
+      task.remaining,
+      task.followUpOf,
+    ]),
+    [
+      ['big', 4, 4, ''],
+      ['small', 1, 1, ''],
+    ],
+  );
+  assert.deepEqual(state.projects, [
+    {
+      id: 'p1',
+      name: '사이드 프로젝트',
+      icon: 'folder',
+      color: '#d08c6f',
+      outcome: '',
+      image: '',
+    },
+  ]);
+  assert.deepEqual(state.tickets, []);
+  assert.deepEqual(state.templates, []);
+  assert.equal(state.settings.focus, 900);
+  assert.equal(state.settings.dailyCapacity, 8);
+  assert.deepEqual(state.settings.remindDays, [1, 2, 3, 4, 5]);
+  assert.equal(state.timer.taskId, 'big');
+  assert.equal(state.timer.phase, 'focus');
+  // Sync metadata and the pending log survive the table rebuild in order.
+  assert.deepEqual(store.syncState(), {
+    deviceId: DEVICE,
+    logging: true,
+    cursor: 7,
+    lastSyncAt: 123,
+  });
+  assert.deepEqual(
+    store.pendingChanges().map((c) => [c.seq, c.entity, c.id, c.data]),
+    [
+      [3, 'task', 'small', { id: 'small' }],
+      [9, 'project', 'gone', null],
+    ],
+  );
+  assert.ok(fs.existsSync(path.join(f.directory, 'to3mato.pre-v4.sqlite3')));
+  const backup = new DatabaseSync(
+    path.join(f.directory, 'to3mato.pre-v4.sqlite3'),
+    { readOnly: true },
+  );
+  assert.ok(backup.prepare('PRAGMA user_version').get().user_version < 4);
+  backup.close();
+}
+
+test('v3 database migrates to v4 with estimates, log order, sync state and a backup', (t) => {
+  const f = fixture(t);
+  createV3Database(path.join(f.directory, 'to3mato.sqlite3'));
+  const store = f.store();
+  let state = store.load();
+  assertMigratedV3(f, store, state);
+  // New log rows continue after the copied sequence numbers.
+  state = applyCommand(state, {
+    type: 'settings:save',
+    payload: { dailyCapacity: 6, planAt: '09:00' },
+  });
+  store.save(state);
+  const last = store.pendingChanges().at(-1);
+  assert.ok(last.seq > 9);
+  assert.equal(last.entity, 'settings');
+  assert.equal(last.data.dailyCapacity, 6);
+  assert.equal(last.data.planAt, '09:00');
+  // The rebuilt tables accept the new phase and entities.
+  state = applyCommand(
+    state,
+    { type: 'timer:play', payload: { id: 'small' } },
+    1000,
+  );
+  state = applyCommand(state, { type: 'checkin:done' }, 1_501_000 + 1000);
+  store.save(state);
+  assert.equal(state.tickets.length, 1);
+  assert.equal(
+    store.db
+      .prepare("SELECT count(*) AS n FROM changes WHERE entity = 'ticket'")
+      .get().n,
+    1,
+  );
+  store.close();
+  assert.deepEqual(f.store().load(), state);
+});
+
+test('v2 database migrates through v3 to v4 and keeps both backups', (t) => {
+  const f = fixture(t);
+  createV3Database(path.join(f.directory, 'to3mato.sqlite3'), { version: 2 });
+  const store = f.store();
+  const state = store.load();
+  assertMigratedV3(f, store, state);
+  assert.equal(state.settings.trayDisplay, 'clock');
+  assert.ok(fs.existsSync(path.join(f.directory, 'to3mato.pre-v3.sqlite3')));
+  store.close();
+  assert.deepEqual(f.store().load(), state);
+});
+
+test('a check-in timer persists across restarts and does not advance on its own', (t) => {
   const f = fixture(t),
     store = f.store();
   let state = store.load();
-  store.resetSync();
-  const sync = store.syncState(),
-    pending = store.pendingChanges();
-  store.db.exec(
-    'ALTER TABLE settings DROP COLUMN tray_display; PRAGMA user_version = 2;',
+  state = applyCommand(
+    state,
+    { type: 'timer:play', payload: { id: 't1' } },
+    1000,
   );
+  state = applyCommand(
+    state,
+    { type: 'settings:save', payload: { rest: 600 } },
+    1_501_000 + 1000,
+  );
+  assert.equal(state.timer.phase, 'checkin');
+  store.save(state);
   store.close();
-  const migrated = f.store();
-  assert.deepEqual(migrated.load(), state);
-  assert.deepEqual(migrated.syncState(), sync);
-  assert.deepEqual(migrated.pendingChanges(), pending);
-  assert.ok(fs.existsSync(path.join(f.directory, 'to3mato.pre-v3.sqlite3')));
+  const reopened = f.store();
+  const loaded = reopened.load();
+  assert.deepEqual(loaded, state);
+  assert.equal(loaded.timer.running, false);
+  assert.equal(
+    reopened.db.prepare('SELECT phase, task_id FROM timer WHERE id = 1').get()
+      .phase,
+    'checkin',
+  );
+});
+
+test('tickets and templates round-trip and old exports normalize to the full shape', (t) => {
+  const f = fixture(t),
+    store = f.store();
+  let state = store.load();
   state = applyCommand(state, {
-    type: 'settings:save',
-    payload: { trayDisplay: 'ring' },
+    type: 'template:save',
+    payload: {
+      name: '학습 1회차',
+      steps: [
+        { title: '%n%강 읽기', estimate: 1 },
+        { title: '%n%강 문제 풀기', estimate: 2 },
+      ],
+    },
   });
-  migrated.save(state);
-  assert.equal(migrated.pendingChanges().at(-1).data.trayDisplay, 'ring');
-  migrated.close();
+  state = applyCommand(
+    state,
+    { type: 'task:toggle', payload: { id: 't3' } },
+    5000,
+  );
+  state = applyCommand(state, {
+    type: 'ticket:update',
+    payload: {
+      id: state.tickets[0].id,
+      highlight: true,
+      sticker: 'star',
+      note: '메모',
+    },
+  });
+  state = applyCommand(state, {
+    type: 'project:save',
+    payload: {
+      id: 'p1',
+      name: '사이드 프로젝트',
+      outcome: '제안서 초안 PDF',
+      image: 'cover.png',
+    },
+  });
+  store.save(state);
+  store.close();
   assert.deepEqual(f.store().load(), state);
+  const stripped = structuredClone(createInitialState());
+  delete stripped.tickets;
+  delete stripped.templates;
+  for (const task of stripped.tasks) {
+    delete task.remaining;
+    delete task.followUpOf;
+  }
+  for (const project of stripped.projects) {
+    delete project.outcome;
+    delete project.image;
+  }
+  stripped.settings = { focus: 1500, rest: 300 };
+  assert.deepEqual(
+    normalizeState(stripped),
+    createInitialState(stripped.tasks[0].date),
+  );
 });
