@@ -13,6 +13,7 @@
   let dialog: HTMLDialogElement;
   let mode = $state<'batch' | 'template'>('batch');
   let templateDate = $state('');
+  let session = $state(0);
   let project = $state(''),
     template = $state(''),
     count = $state<number | undefined>(10),
@@ -41,6 +42,7 @@
     nextMode: 'batch' | 'template' = 'batch',
     date = '',
   ) {
+    session++;
     mode = nextMode;
     templateDate = date;
     project = id;
@@ -139,6 +141,7 @@
     <div class="add-mode">
       <button
         type="button"
+        disabled={busy}
         onclick={() => {
           dialog.close();
           onsingle(project);
@@ -159,12 +162,12 @@
       >
     </div>
     {#if mode === 'template'}
-      <TemplateBatch
-        bind:project
-        date={templateDate}
-        onclose={() => dialog.close()}
-        onbusy={(value) => (busy = value)}
-      />
+      {#key session}<TemplateBatch
+          bind:project
+          date={templateDate}
+          onclose={() => dialog.close()}
+          onbusy={(value) => (busy = value)}
+        />{/key}
     {:else}
       <form onsubmit={generate} class="batch-form">
         <div class="batch-scroll">

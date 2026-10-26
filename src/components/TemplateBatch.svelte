@@ -52,7 +52,7 @@
     const success = await send('template:save', {
       id: selected || undefined,
       name,
-      steps,
+      steps: steps.map(({ title, estimate }) => ({ title, estimate })),
     });
     if (success && !selected)
       selected = $appState.templates.find((t) => !previous.has(t.id))?.id ?? '';
