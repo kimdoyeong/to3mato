@@ -1,0 +1,128 @@
+/*
+  To3mato 손글씨 스타일 토큰
+  색, 글꼴, 모서리, 기울기, 간격 값을 한곳에 모은다.
+  부품과 화면 규칙은 components.css가 이 토큰만 써서 정의한다.
+  electron/tray-image.mjs가 --red --green --ink 값을 이 파일에서 읽는다. 6자리 16진수를 유지한다.
+*/
+
+/* 숫자 0~9만 푸어스토리로 대체 (감자꽃의 0이 o, 1이 l처럼 보임). 파일은 1.4KB */
+@font-face {
+  font-family: 'Poor Story Digits';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/poor-story-digits.woff2') format('woff2');
+  unicode-range: U+30-39;
+}
+
+:root {
+  /* ───────── 색 ───────── */
+  --bg: #fff3e3;
+  --bg-dots: #f8dcc0;
+  --paper: #fffdf8;
+  --paper-warm: #fff9f0; /* 실행 영역 바탕 */
+  --paper-soft: #fff9ef; /* 바로 추가 줄, 빈 목록 바탕 */
+  --paper-tab: #ffe9d2; /* 왼쪽 탭 띠 */
+  --ink: #4a3128;
+  --muted: #7f685a;
+  --ink-soft: #a8927f; /* 완료한 제목 */
+  --ink-hint: #b49a87; /* 입력 안내, 더보기 */
+  --ink-chip: #6f5535; /* 프로젝트 칩 글자 */
+  --line: #f1dcc7;
+  --line-strong: #e8c9ad;
+  --line-check: #e2c6ae;
+  --stroke-soft: #c9b3a2; /* 연필 윤곽, 동그라미, 손잡이 */
+  --red: #d9452f;
+  --red-hover: #c13a26;
+  --red-deep: #a62f1e;
+  --tomato: #ef5b43; /* 토마토 몸통, 진행 막대 */
+  --tomato-light: #f8765f;
+  --tomato-half: #f8a593;
+  --coral: #f08b72; /* 현재 할 일 테두리 */
+  --coral-light: #f4b69d;
+  --peach: #ffe6d6;
+  --peach-deep: #f9c9ae;
+  --peach-panel: #ffeadb; /* 타이머 판 */
+  --peach-current: #fff1e7; /* 현재 할 일 바탕 */
+  --peach-hover: #fff6ea;
+  --butter: #fff0c7;
+  --butter-deep: #f6dc92;
+  --butter-ink: #7a6240;
+  --green: #4f8a3a;
+  --green-light: #e5f2d6;
+  --green-hover: #d6eac1;
+  --leaf: #69a84f;
+  --leaf-light: #b5d79b;
+  --leaf-pale: #c9d9b3;
+  --tape-green: #c9e3b3;
+  --done: #faf3e8; /* 완료한 종이 */
+  --highlight: #f2a24b; /* 물결 밑줄, 초점 테두리 */
+  --kraft: #e9d8c6; /* 영상 썸네일 자리 */
+  --kraft-deep: #d8c2aa;
+  --toast-shadow: #2e1c15;
+
+  /* ───────── 글꼴 ───────── */
+  --font-body: 'Poor Story', 'Noto Sans KR', sans-serif;
+  --font-display:
+    'Poor Story Digits', 'Gamja Flower', 'Poor Story', 'Noto Sans KR',
+    sans-serif;
+  --font-num: 'Poor Story', 'Noto Sans KR', sans-serif;
+
+  /* ───────── 글자 크기 ───────── */
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-md: 17px;
+  --text-lg: 19px;
+  --text-xl: 22px;
+  --text-title: 27px;
+  --text-h2: 30px;
+  --text-h2-lg: 32px;
+  --text-h1: 40px;
+  --text-clock: 96px;
+
+  /* ───────── 간격 ───────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 36px;
+
+  /* ───────── 모서리: 손으로 그린 듯 살짝 삐뚤한 값 ───────── */
+  --radius: 20px;
+  --wobble-s: 14px 18px 13px 17px / 17px 13px 18px 14px;
+  --wobble-a: 24px 30px 22px 28px / 28px 22px 30px 24px;
+  --wobble-b: 30px 22px 28px 24px / 22px 28px 24px 30px;
+  --wobble-l: 38px 44px 36px 42px / 42px 36px 44px 38px;
+  --wobble-xl: 34px 40px 32px 38px / 38px 32px 40px 34px;
+  --wobble-row: 20px 24px 18px 22px / 22px 18px 24px 20px;
+  --wobble-mode: 16px 20px 15px 19px / 19px 15px 20px 16px;
+  --wobble-seg: 12px 9px 11px 9px / 9px 11px 9px 12px;
+  --wobble-tab: 3px 16px 18px 3px / 3px 18px 16px 3px;
+  --blob: 50% 46% 52% 48% / 48% 52% 46% 50%;
+
+  /* ───────── 기울기 ───────── */
+  --tilt-a: -0.5deg;
+  --tilt-b: 0.4deg;
+  --tilt-c: -0.25deg;
+
+  /* ───────── 그림자 ───────── */
+  --shadow-sticker: 0 3px 0 var(--line);
+  --shadow-peach: 0 3px 0 var(--peach-deep);
+  --shadow-butter: 0 4px 0 var(--butter-deep);
+}
+
+/* ───────── 바탕 ───────── */
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--bg-dots) 1.3px, transparent 1.5px);
+  background-size: 26px 26px;
+}

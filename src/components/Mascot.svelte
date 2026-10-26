@@ -3,7 +3,7 @@
     phase = 'idle',
     paused = false,
   }: {
-    phase?: 'idle' | 'focus' | 'rest';
+    phase?: 'idle' | 'focus' | 'rest' | 'checkin' | 'ticket';
     paused?: boolean;
   } = $props();
 </script>
@@ -77,6 +77,14 @@
             stroke-width="3"
             stroke-linecap="round"
           />
+          <path
+            class="checkin-eyes"
+            d="M44 78q5-6 10 0m32 0q5-6 10 0"
+            fill="none"
+            stroke="#4a3128"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
           <ellipse
             cx="36"
             cy="88"
@@ -94,7 +102,16 @@
             opacity=".75"
           />
           <path
+            class="mouth"
             d="M62 87q8 10 16 0"
+            fill="none"
+            stroke="#4a3128"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+          <path
+            class="mouth-wide"
+            d="M58 86q12 14 24 0"
             fill="none"
             stroke="#4a3128"
             stroke-width="3"
@@ -151,7 +168,9 @@
     transform-box: fill-box;
     transform-origin: center;
   }
-  .rest-eyes {
+  .rest-eyes,
+  .checkin-eyes,
+  .mouth-wide {
     display: none;
   }
 
@@ -190,6 +209,55 @@
   }
   [data-phase='rest'] .rest-eyes {
     display: inline;
+  }
+  /* 진척 확인: 눈을 감고 웃으며 고개를 까딱인다 */
+  [data-phase='checkin'] .body {
+    animation: nod 2.2s ease-in-out infinite;
+  }
+  [data-phase='checkin'] .leaves {
+    animation-duration: 2.2s;
+  }
+  [data-phase='checkin'] .face {
+    animation: none;
+  }
+  [data-phase='checkin'] .open-eyes,
+  [data-phase='checkin'] .mouth {
+    display: none;
+  }
+  [data-phase='checkin'] .checkin-eyes,
+  [data-phase='checkin'] .mouth-wide {
+    display: inline;
+  }
+  /* 발권: 짧은 점프 한 번 */
+  [data-phase='ticket'] .hop {
+    animation: ticket-hop 0.9s ease-out 1 both;
+  }
+  [data-phase='ticket'] .body {
+    animation: ticket-squash 0.9s ease-out 1 both;
+  }
+  [data-phase='ticket'] .leaves {
+    animation: leaf-bounce 0.9s 1 both;
+  }
+  [data-phase='ticket'] .shadow {
+    animation: hop-shadow 0.9s 1 both;
+  }
+  [data-phase='ticket'] .face {
+    animation: none;
+  }
+  [data-phase='ticket'] .mouth {
+    display: none;
+  }
+  [data-phase='ticket'] .mouth-wide {
+    display: inline;
+  }
+  [data-phase='ticket'] .spark {
+    animation: sparkle 0.9s ease-out 1;
+  }
+  [data-phase='ticket'] .sparkle-right {
+    animation-delay: 0.08s;
+  }
+  [data-phase='ticket'] .sparkle-dot {
+    animation-delay: 0.16s;
   }
   .tomato-illustration.paused svg * {
     animation-play-state: paused;
@@ -350,6 +418,53 @@
     60% {
       opacity: 0;
       transform: translateY(-10px) scale(0.65) rotate(15deg);
+    }
+  }
+  @keyframes nod {
+    0%,
+    100% {
+      transform: rotate(-3deg) scale(1.02, 0.99);
+    }
+    50% {
+      transform: translateY(-2px) rotate(3deg) scale(0.99, 1.02);
+    }
+  }
+  @keyframes ticket-hop {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    20% {
+      transform: translateY(2px);
+      animation-timing-function: ease-out;
+    }
+    50% {
+      transform: translateY(-26px);
+      animation-timing-function: ease-in;
+    }
+    80% {
+      transform: translateY(0);
+    }
+    90% {
+      transform: translateY(-4px);
+    }
+  }
+  @keyframes ticket-squash {
+    0%,
+    100% {
+      transform: scale(1) rotate(0);
+    }
+    20% {
+      transform: scale(1.16, 0.84);
+    }
+    45% {
+      transform: scale(0.92, 1.1) rotate(-4deg);
+    }
+    80% {
+      transform: scale(1.12, 0.88) rotate(2deg);
+    }
+    90% {
+      transform: scale(0.98, 1.03);
     }
   }
   @keyframes rest-sway {

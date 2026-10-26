@@ -35,7 +35,7 @@
       "dist/**/*",
       "electron/**/*",
       "src/lib/domain.mjs",
-      "src/styles/theme.css",
+      "src/styles/tokens.css",
       "package.json"
     ],
     "asar": true,

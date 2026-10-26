@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { deflateSync, inflateSync } from 'node:zlib';
 
 const theme = readFileSync(
-  new URL('../src/styles/theme.css', import.meta.url),
+  new URL('../src/styles/tokens.css', import.meta.url),
   'utf8',
 );
 const color = (name) =>
