@@ -161,8 +161,8 @@ export function createAccountSync({
       }
       report();
     },
-    async requestCode(email) {
-      return (await ensureAuth()).requestCode(email);
+    async requestCode(email, mode) {
+      return (await ensureAuth()).requestCode(email, mode);
     },
     async verify(email, code) {
       if (user) throw new Error('로그아웃 후 로그인하세요.');

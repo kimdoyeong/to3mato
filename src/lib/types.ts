@@ -99,6 +99,7 @@ export type AccountStatus = {
     document?: unknown;
   }>;
 };
+export type AuthMode = 'login' | 'signup';
 export type Command = { type: string; payload?: Record<string, unknown> };
 export type UpdateStatus =
   | { status: 'idle' | 'checking' }
@@ -110,7 +111,7 @@ declare global {
     to3mato?: {
       account: {
         status(): Promise<AccountStatus>;
-        requestCode(email: string): Promise<void>;
+        requestCode(email: string, mode: AuthMode): Promise<void>;
         verify(email: string, code: string): Promise<AccountStatus>;
         enable(): Promise<AccountStatus>;
         disable(): Promise<AccountStatus>;
@@ -156,6 +157,10 @@ declare global {
       dispatch(command: Command): Promise<AppState>;
       subscribe(callback: (state: AppState) => void): () => void;
       onRitual(callback: (kind: 'plan' | 'review') => void): () => void;
+      onboarding: {
+        status(): Promise<boolean>;
+        finish(): Promise<void>;
+      };
       ritualDates(): Promise<{ plannedDate: string; reviewedDate: string }>;
       finishRitual(kind: 'plan' | 'review', date: string): Promise<boolean>;
       onError(callback: (message: string) => void): () => void;

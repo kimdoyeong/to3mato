@@ -1,13 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { AccountStatus } from '../lib/types';
-  import { backupMedia, adoptMedia, mediaSyncError } from '../lib/media-sync';
-  import { syncContext } from '../lib/sync-context';
+  import { mediaSyncError } from '../lib/media-sync';
+  import { enableSync, errorText } from '../lib/account';
+  import AuthForm from './AuthForm.svelte';
   let account = $state<AccountStatus | null>(null);
-  let email = $state(''),
-    code = $state(''),
-    sent = $state(false),
-    busy = $state(false),
+  let busy = $state(false),
     error = $state('');
   onMount(() =>
     window.to3mato?.account.subscribe((value) => (account = value)),
@@ -19,29 +17,10 @@
       await action();
       account = await window.to3mato!.account.status();
     } catch (failure) {
-      error =
-        failure instanceof Error
-          ? failure.message.replace(
-              /^Error invoking remote method '[^']+': (?:Error: )?/,
-              '',
-            )
-          : '요청을 처리하지 못했습니다.';
+      error = errorText(failure);
     } finally {
       busy = false;
     }
-  }
-  async function enable() {
-    const adopt = account?.adoptLocalMedia;
-    const backup = await backupMedia(adopt ? 'local' : account?.scope);
-    account = await window.to3mato!.account.enable();
-    const next = await window.to3mato!.load();
-    syncContext.set(next.syncContext);
-    // Adoption is explicitly allowed only for the first account bound to local data.
-    if (adopt && account.adoptLocalMedia) {
-      await adoptMedia(backup);
-      await window.to3mato!.account.mediaAdopted();
-    }
-    location.reload();
   }
   function exportConflict(conflict: AccountStatus['conflicts'][number]) {
     const url = URL.createObjectURL(
@@ -65,42 +44,7 @@
     {:else}
       <p>연동하면 다른 기기와 동기화되어 사용하실 수 있습니다.</p>
       {#if !account.user}
-        <div class="setting-row">
-          <label for="account-email">이메일</label><input
-            id="account-email"
-            type="email"
-            bind:value={email}
-            disabled={busy}
-          />
-        </div>
-        <button
-          class="secondary"
-          disabled={busy || !email}
-          onclick={() =>
-            run(async () => {
-              await window.to3mato!.account.requestCode(email);
-              sent = true;
-            })}>인증 코드 받기</button
-        >
-        {#if sent}
-          <p>인증 코드를 보냈습니다. 10분 안에 입력하세요.</p>
-          <div class="setting-row">
-            <label for="account-code">인증 코드</label><input
-              id="account-code"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              bind:value={code}
-              disabled={busy}
-            />
-          </div>
-          <button
-            class="secondary"
-            disabled={busy || !code}
-            onclick={() =>
-              run(() => window.to3mato!.account.verify(email, code))}
-            >로그인</button
-          >
-        {/if}
+        <AuthForm onverified={(status) => (account = status)} />
       {:else}
         <p>{account.user.email}</p>
         <div class="data-actions">
@@ -121,7 +65,7 @@
             <button
               class="secondary"
               disabled={busy}
-              onclick={() => run(enable)}>연동</button
+              onclick={() => run(() => enableSync(account))}>연동</button
             >
           {/if}
           <button

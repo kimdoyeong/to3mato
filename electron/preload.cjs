@@ -2,7 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('to3mato', {
   account: {
     status: () => ipcRenderer.invoke('account:status'),
-    requestCode: (email) => ipcRenderer.invoke('account:requestCode', email),
+    requestCode: (email, mode) =>
+      ipcRenderer.invoke('account:requestCode', email, mode),
     verify: (email, code) => ipcRenderer.invoke('account:verify', email, code),
     enable: () => ipcRenderer.invoke('account:enable'),
     mediaAdopted: () => ipcRenderer.invoke('account:mediaAdopted'),
@@ -90,6 +91,10 @@ contextBridge.exposeInMainWorld('to3mato', {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on('state:changed', listener);
     return () => ipcRenderer.removeListener('state:changed', listener);
+  },
+  onboarding: {
+    status: () => ipcRenderer.invoke('onboarding:status'),
+    finish: () => ipcRenderer.invoke('onboarding:finish'),
   },
   ritualDates: () => ipcRenderer.invoke('ritual:dates'),
   finishRitual: (kind, date) => ipcRenderer.invoke('ritual:finish', kind, date),

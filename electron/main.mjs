@@ -17,6 +17,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SQLiteStore } from './storage.mjs';
 import { createAccountSync } from './sync.mjs';
+import { createOnboarding, onboardingMode } from './onboarding.mjs';
 import { setCalendarTimeZone } from '../src/lib/calendar-time.mjs';
 import { createTimerTray } from './tray.mjs';
 import {
@@ -56,7 +57,7 @@ protocol.registerSchemesAsPrivileged([
 const dev = process.env.TO3MATO_DEV_URL;
 if (dev && new URL(dev).origin !== 'http://127.0.0.1:4173')
   throw new Error('Invalid development URL');
-let window, store, state, ticker, updater, account;
+let window, store, state, ticker, updater, account, onboarding;
 let quitting = false;
 export let timerTray;
 if (!app.requestSingleInstanceLock()) {
@@ -72,6 +73,14 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(async () => {
+      // Read before the store creates the file: an existing database means an
+      // upgrade, which skips the first-run walkthrough.
+      onboarding = createOnboarding(app.getPath('userData'), {
+        mode: onboardingMode(),
+        existing: fs.existsSync(
+          path.join(app.getPath('userData'), 'to3mato.sqlite3'),
+        ),
+      });
       try {
         store = new SQLiteStore(app.getPath('userData'));
         state = store.load();
@@ -417,6 +426,14 @@ if (!app.requestSingleInstanceLock()) {
           if (confirmation.response !== 1) return null;
           return commit(imported, true);
         });
+        ipcMain.handle('onboarding:status', (event) => {
+          trusted(event);
+          return onboarding.pending();
+        });
+        ipcMain.handle('onboarding:finish', (event) => {
+          trusted(event);
+          onboarding.finish();
+        });
         const rituals = createRitualLedger(app.getPath('userData'));
         ipcMain.handle('ritual:dates', (event) => {
           trusted(event);
@@ -539,7 +556,7 @@ if (!app.requestSingleInstanceLock()) {
         });
         const accountMethods = {
           status: () => account.status(),
-          requestCode: (email) => account.requestCode(email),
+          requestCode: (email, mode) => account.requestCode(email, mode),
           verify: (email, code) => account.verify(email, code),
           enable: () => {
             store.snapshot(

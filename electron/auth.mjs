@@ -120,7 +120,13 @@ export function createAuth({
       user = data.session?.user || null;
       return user;
     },
-    async requestCode(email) {
+    /**
+     * 'login' never creates an account, so a mistyped address does not sign
+     * up silently. 'signup' creates the account on first verification.
+     */
+    async requestCode(email, mode = 'signup') {
+      if (mode !== 'login' && mode !== 'signup')
+        throw new Error('잘못된 요청입니다.');
       if (
         typeof email !== 'string' ||
         email.length > 254 ||
@@ -131,7 +137,15 @@ export function createAuth({
         throw new Error(
           '이 컴퓨터에서는 로그인 정보를 안전하게 저장할 수 없습니다.',
         );
-      unwrap(await client.auth.signInWithOtp({ email }));
+      const result = await client.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: mode === 'signup' },
+      });
+      // Supabase answers 422 otp_disabled when a login code is requested
+      // for an address without an account.
+      if (mode === 'login' && result.error?.code === 'otp_disabled')
+        throw new Error('가입된 계정이 없습니다. 회원가입을 진행하세요.');
+      unwrap(result);
     },
     async verify(email, code) {
       if (

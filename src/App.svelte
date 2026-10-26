@@ -31,6 +31,7 @@
   import FocusLog from './components/FocusLog.svelte';
   import DeliveryNotice from './components/DeliveryNotice.svelte';
   import EstimatePicker from './components/EstimatePicker.svelte';
+  import Onboarding from './components/Onboarding.svelte';
   let batchDialog: {
     open: (
       id: string,
@@ -437,3 +438,4 @@
 {#if $ready}<CaptureMoment /><DeliveryNotice
     onopen={() => (tab = 'log')}
   />{/if}
+<Onboarding />

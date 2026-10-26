@@ -28,6 +28,9 @@ async function open() {
   const context = await browser.newContext({
     viewport: { width: 1100, height: 900 },
   });
+  await context.addInitScript(() =>
+    localStorage.setItem('to3mato-onboarding-v1', 'done'),
+  );
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:4178');
   await expect(page.getByRole('navigation')).toBeVisible();
