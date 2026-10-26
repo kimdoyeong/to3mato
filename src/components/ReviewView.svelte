@@ -84,10 +84,14 @@
                 /><span class:done={task.done}>{task.title}</span>
               </div></td
             ><td><span class="pomo-count">{task.estimate}<Tomato /></span></td
-            ><td><span class="pomo-count">{used}<Tomato filled /></span></td><td
+            ><td
+              ><span class="pomo-count">{used}<Tomato filled={used > 0} /></span
+              ></td
+            ><td
               class="num"
-              class:over={diff > 0}
-              class:saved={diff < 0}>{diff > 0 ? '+' : ''}{diff}</td
+              class:over={task.done && diff > 0}
+              class:saved={task.done && diff < 0}
+              >{#if task.done}{diff > 0 ? '+' : ''}{diff}{/if}</td
             ></tr
           >
         {/each}

@@ -14,7 +14,12 @@
   import type { Project, Task } from './lib/types';
   import Icon from './components/Icon.svelte';
   import ReviewView from './components/ReviewView.svelte';
-  import { planOpen, ritualDates } from './lib/ritual-state';
+  import {
+    planOpen,
+    ritualDates,
+    ritualsReady,
+    loadRitualDates,
+  } from './lib/ritual-state';
   import { planIsDue } from './lib/rituals.mjs';
   import TodoView from './components/TodoView.svelte';
   import ProjectsView from './components/ProjectsView.svelte';
@@ -44,7 +49,11 @@
     projectError = $state('');
   let reviewOpen = $state(false);
   $effect(() => {
-    if ($ready && planIsDue($appState.settings, $now, $ritualDates.plannedDate))
+    if (
+      $ready &&
+      $ritualsReady &&
+      planIsDue($appState.settings, $now, $ritualDates.plannedDate)
+    )
       planOpen.set(true);
   });
   async function closeReview() {
@@ -82,6 +91,7 @@
   onMount(() => {
     let disposed = false,
       cleanup: (() => void) | undefined;
+    void loadRitualDates();
     const stopRitual = window.to3mato?.onRitual((kind) => {
       if (kind === 'plan') {
         tab = 'todo';

@@ -45,21 +45,39 @@ export function startedTimerNotification(previous, next, now = Date.now()) {
   };
 }
 
-/** Return the next due ritual without mutating the caller's per-day ledger. */
-export function dueReminder(state, now = Date.now(), fired = {}) {
+const RITUALS = [
+  ['plan', 'planAt', '계획 시작'],
+  ['review', 'reviewAt', '돌아보기'],
+];
+/**
+ * Decide this minute's ritual reminder from settings and the per-day ledger
+ * ({ sent, done }), without mutating either. A reminder is due once its time
+ * has passed on a selected weekday, unless it was already shown or the user
+ * already finished that ritual today. When several are due at once (the app
+ * was off), only the latest-scheduled one is shown and the earlier ones are
+ * settled with it, so a late launch never produces a burst.
+ */
+export function nextReminder(state, now = Date.now(), ledger = {}) {
   const date = new Date(now);
-  if (!state.settings.remindDays.includes(date.getDay())) return null;
+  if (!state.settings.remindDays.includes(date.getDay()))
+    return { reminder: null, settled: [] };
   const today = localDate(date);
   const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-  for (const [kind, title] of [
-    ['plan', '계획 시작'],
-    ['review', '돌아보기'],
-  ]) {
-    const at = state.settings[kind + 'At'];
-    if (at && time >= at && fired[kind] !== today)
-      return { kind, title, body: '' };
-  }
-  return null;
+  const due = RITUALS.filter(([kind, key]) => {
+    const at = state.settings[key];
+    return (
+      at &&
+      time >= at &&
+      ledger.sent?.[kind] !== today &&
+      ledger.done?.[kind] !== today
+    );
+  }).sort((a, b) => (state.settings[a[1]] < state.settings[b[1]] ? -1 : 1));
+  if (!due.length) return { reminder: null, settled: [] };
+  const [kind, , title] = due.at(-1);
+  return {
+    reminder: { kind, title, body: '' },
+    settled: due.map(([name]) => name),
+  };
 }
 
 export function createTimerNotifications({

@@ -10,11 +10,13 @@ export function sevenDayAverage(records, today = localDate()) {
   return Math.round(sum / 7);
 }
 
+/** The plan card opens on its own under the same rule as its reminder. */
 export function planIsDue(settings, now, plannedDate) {
   const date = new Date(now);
   const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   return (
     !!settings.planAt &&
+    settings.remindDays.includes(date.getDay()) &&
     time >= settings.planAt &&
     plannedDate !== localDate(date)
   );

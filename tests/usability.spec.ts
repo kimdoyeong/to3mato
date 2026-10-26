@@ -554,12 +554,13 @@ ui(
       .getByRole('button', { name: '프로젝트 아이디어 정리 시작' })
       .click();
     await expect(plan).not.toBeVisible();
-    expect(
-      await page.evaluate(
-        () =>
-          JSON.parse(localStorage.getItem('to3mato-rituals-v1')!).plannedDate,
-      ),
-    ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const plannedDate = await page.evaluate(
+      () => JSON.parse(localStorage.getItem('to3mato-rituals-v1')!).plannedDate,
+    );
+    expect(plannedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await expect
+      .poll(() => page.evaluate(() => window.to3mato!.ritualDates()))
+      .toMatchObject({ plannedDate });
     await mainWindow.evaluate((window) =>
       window.webContents.send('ritual:open', 'review'),
     );
@@ -580,6 +581,12 @@ ui(
     await page.getByRole('button', { name: '돌아보기', exact: true }).click();
     const pending = page.getByRole('region', { name: /^미완료/ });
     await expect(pending).toBeVisible();
+    // Unfinished rows show no difference; only finished ones are compared.
+    const table = page.locator('.review-table');
+    await expect(table.locator('td.num').filter({ hasText: /\S/ })).toHaveCount(
+      0,
+    );
+    await expect(table.locator('.mini-tomato.filled')).toHaveCount(0);
     await page.screenshot({
       path: 'test-results/stage3-review.png',
       fullPage: true,
@@ -624,17 +631,53 @@ ui(
       reviewAt: '18:30',
       remindDays: [1, 2, 3, 4, 5, 6],
     });
-    expect(
-      await page.evaluate(
-        () =>
-          JSON.parse(localStorage.getItem('to3mato-rituals-v1')!).reviewedDate,
-      ),
-    ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const reviewedDate = await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('to3mato-rituals-v1')!).reviewedDate,
+    );
+    expect(reviewedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // The main process records it too, so today's review reminder is skipped.
+    await expect
+      .poll(() => page.evaluate(() => window.to3mato!.ritualDates()))
+      .toMatchObject({ reviewedDate });
     await page.getByLabel('계획 시각', { exact: true }).fill('');
     await page.getByLabel('돌아보기 시각', { exact: true }).fill('');
     await page.reload();
     expect(
       (await page.evaluate(() => window.to3mato!.load())).settings,
     ).toMatchObject({ planAt: '', reviewAt: '', dailyCapacity: 7 });
+  },
+);
+
+ui(
+  'a dismissed plan card stays closed after a reload even without browser storage',
+  async ({ appPage: page }) => {
+    const today = new Date().getDay();
+    await page.evaluate(
+      (day) =>
+        window.to3mato!.dispatch({
+          type: 'settings:save',
+          payload: { planAt: '00:00', remindDays: [day] },
+        }),
+      today,
+    );
+    const plan = page.getByRole('region', { name: '계획 시작', exact: true });
+    await expect(plan).toBeVisible();
+    await plan.getByRole('button', { name: '닫기', exact: true }).click();
+    await expect(plan).not.toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => window.to3mato!.ritualDates()))
+      .toMatchObject({
+        plannedDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      });
+    // The main process keeps the dismissal, so clearing local storage and
+    // reloading does not reopen the card.
+    await page.evaluate(() => localStorage.removeItem('to3mato-rituals-v1'));
+    await page.reload();
+    await expect(
+      page.getByRole('region', { name: '오늘', exact: true }),
+    ).toBeVisible();
+    await page.waitForTimeout(600);
+    await expect(plan).not.toBeVisible();
   },
 );

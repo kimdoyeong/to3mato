@@ -26,8 +26,13 @@ import {
   completedTimerNotification,
   startedTimerNotification,
   createTimerNotifications,
-  dueReminder,
+  nextReminder,
 } from './notifications.mjs';
+import {
+  createRitualLedger,
+  isRitualKind,
+  isRitualDate,
+} from './ritual-ledger.mjs';
 import {
   applyCommand,
   advanceTimer,
@@ -395,16 +400,30 @@ if (!app.requestSingleInstanceLock()) {
           if (confirmation.response !== 1) return null;
           return commit(imported, true);
         });
-        const fired = { plan: '', review: '' };
+        const rituals = createRitualLedger(app.getPath('userData'));
+        ipcMain.handle('ritual:dates', (event) => {
+          trusted(event);
+          const { done } = rituals.get();
+          return { plannedDate: done.plan, reviewedDate: done.review };
+        });
+        ipcMain.handle('ritual:finish', (event, kind, date) => {
+          trusted(event);
+          if (!isRitualKind(kind) || !isRitualDate(date)) return false;
+          return rituals.markDone(kind, date);
+        });
         let reminderMinute = -1;
         ticker = setInterval(() => {
           const now = Date.now();
           const minute = Math.floor(now / 60000);
           if (minute !== reminderMinute) {
             reminderMinute = minute;
-            let reminder;
-            while ((reminder = dueReminder(state, now, fired))) {
-              fired[reminder.kind] = localDate(new Date(now));
+            const { reminder, settled } = nextReminder(
+              state,
+              now,
+              rituals.get(),
+            );
+            if (reminder) {
+              rituals.markSent(settled, localDate(new Date(now)));
               notifications.show(reminder);
             }
           }
