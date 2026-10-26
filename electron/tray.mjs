@@ -22,7 +22,13 @@ export function popoverPosition(bounds, workArea, size) {
   };
 }
 
-export function createTimerTray({ getState, onError, showMain, dev }) {
+export function createTimerTray({
+  getState,
+  getNow = Date.now,
+  onError,
+  showMain,
+  dev,
+}) {
   const icon = nativeImage.createFromPath(
     fileURLToPath(new URL('./assets/mascot-tray.png', import.meta.url)),
   );
@@ -105,7 +111,7 @@ export function createTimerTray({ getState, onError, showMain, dev }) {
   const update = () => {
     if (tray.isDestroyed()) return;
     const state = getState(),
-      view = timerMenuState(state);
+      view = timerMenuState(state, getNow());
     const display = state.settings.trayDisplay ?? 'clock';
     const text = `${display}:${view.clock}:${view.status}`;
     if (text !== previousText) {

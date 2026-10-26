@@ -1,4 +1,5 @@
 import { localDate, usedPomodoros } from './domain.mjs';
+import { calendarWeek, calendarTimeZone } from './calendar-time.mjs';
 
 /** @typedef {import('./types').AppState} AppState */
 /** @typedef {import('./types').Ticket} Ticket */
@@ -28,13 +29,14 @@ export function projectSummary(state, projectId) {
 
 /** Local Monday 00:00 of the week holding `at`. */
 function weekStart(at) {
-  const start = new Date(at);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  return start;
+  return calendarWeek(0, new Date(at)).start;
 }
 const short = (date) =>
-  date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+  date.toLocaleDateString('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    timeZone: calendarTimeZone(),
+  });
 
 /**
  * Group tickets by week, newest week and newest ticket first. The week id
@@ -50,8 +52,7 @@ export function ticketWeeks(tickets) {
     const id = localDate(start);
     let week = weeks.get(id);
     if (!week) {
-      const end = new Date(start);
-      end.setDate(end.getDate() + 7);
+      const end = calendarWeek(0, start).end;
       const last = new Date(end.getTime() - 1);
       week = {
         id,

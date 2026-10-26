@@ -1,4 +1,5 @@
 /** @typedef {import('./types').AppState} AppState */
+import { dateInZone, shiftDay } from './calendar-time.mjs';
 export const MAX_TASK_ESTIMATE = 2;
 export const MAX_LEGACY_ESTIMATE = 48;
 export const TICKET_STICKERS = ['', 'star', 'heart', 'leaf'];
@@ -6,12 +7,9 @@ export const DEFAULT_REMIND_DAYS = [1, 2, 3, 4, 5];
 export const DEFAULT_DAILY_CAPACITY = 8;
 export const MAX_TEMPLATE_STEPS = 20;
 export const MAX_TEMPLATES = 500;
-export const localDate = (date = new Date()) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+export const localDate = dateInZone;
 export function offsetDate(offset, base = localDate()) {
-  const d = new Date(base + 'T12:00:00');
-  d.setDate(d.getDate() + offset);
-  return localDate(d);
+  return shiftDay(base, offset);
 }
 export function dateLabel(date) {
   return new Date(date + 'T12:00:00').toLocaleDateString('ko-KR', {
@@ -163,7 +161,7 @@ function validDate(value) {
   if (
     typeof value !== 'string' ||
     !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
-    localDate(new Date(value + 'T12:00:00')) !== value
+    localDate(new Date(value + 'T12:00:00Z'), 'UTC') !== value
   )
     throw new Error('날짜 형식이 올바르지 않습니다.');
   return value;
@@ -542,12 +540,12 @@ function newTask(fields) {
   };
 }
 /** @param {AppState} input @param {{type:string,payload?:Record<string,any>}} command @returns {AppState} */
-export function applyCommand(input, command, now = Date.now()) {
+export function applyCommand(input, command, now = Date.now(), options = {}) {
   if (!command || typeof command.type !== 'string')
     throw new Error('잘못된 요청입니다.');
   const state = structuredClone(input),
     p = command.payload || {};
-  advanceTimer(state, now);
+  if (options.advance !== false) advanceTimer(state, now);
   switch (command.type) {
     case 'task:save': {
       const existing = state.tasks.find((t) => t.id === p.id);

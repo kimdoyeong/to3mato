@@ -216,11 +216,11 @@ test('resetSync queues a snapshot and later changes are logged in order', (t) =>
     assert.ok(changes[i].hlc > changes[i - 1].hlc);
 
   store.disableSync();
-  assert.equal(store.pendingChanges().length, 0);
+  assert.deepEqual(store.pendingChanges(), changes);
   store.save(
     applyCommand(state, { type: 'settings:save', payload: { focus: 900 } }),
   );
-  assert.equal(store.pendingChanges().length, 0);
+  assert.deepEqual(store.pendingChanges(), changes);
 });
 
 test('the clock never repeats, even when time stands still or goes backwards', (t) => {
@@ -603,7 +603,7 @@ test('JSON import tombstones missing rows and revives deleted IDs', (t) => {
   );
 });
 
-test('old tombstones are removed unless they still need to be pushed', (t) => {
+test('old tombstones remain until an explicit snapshot retention policy permits collection', (t) => {
   const f = fixture(t),
     store = f.store();
   let state = store.load();
@@ -623,6 +623,6 @@ test('old tombstones are removed unless they still need to be pushed', (t) => {
   f.clock.now = T0 + 31 * DAY;
   reopened = f.store();
   reopened.load();
-  assert.equal(row(reopened, 'tasks', 't4'), undefined);
+  assert.equal(row(reopened, 'tasks', 't4').deleted, 1);
   assert.equal(row(reopened, 'tasks', 't5').deleted, 1);
 });

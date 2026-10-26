@@ -1,4 +1,5 @@
 import { localDate, offsetDate } from './domain.mjs';
+import { calendarTimeZone } from './calendar-time.mjs';
 
 /** Average of the seven completed local calendar days preceding today. */
 export function sevenDayAverage(records, today = localDate()) {
@@ -13,11 +14,17 @@ export function sevenDayAverage(records, today = localDate()) {
 /** The plan card opens on its own under the same rule as its reminder. */
 export function planIsDue(settings, now, plannedDate) {
   const date = new Date(now);
-  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const time = new Intl.DateTimeFormat('en-GB', {
+    timeZone: calendarTimeZone(),
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+  const day = localDate(date);
   return (
     !!settings.planAt &&
-    settings.remindDays.includes(date.getDay()) &&
+    settings.remindDays.includes(new Date(`${day}T12:00:00Z`).getUTCDay()) &&
     time >= settings.planAt &&
-    plannedDate !== localDate(date)
+    plannedDate !== day
   );
 }

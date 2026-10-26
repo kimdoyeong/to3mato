@@ -13,6 +13,9 @@
     "build": "vite build",
     "test": "node --test tests/*.test.mjs",
     "test:ui": "playwright test",
+    "test:sync": "node --test tests/sync-postgres.test.mjs tests/sync-recovery.test.mjs",
+    "test:sync:ui": "playwright test tests/sync-desktop.spec.ts tests/media-sync.spec.ts",
+    "sync:configure": "node scripts/configure-supabase.mjs",
     "start": "electron .",
     "package": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
@@ -35,6 +38,8 @@
       "dist/**/*",
       "electron/**/*",
       "src/lib/domain.mjs",
+      "src/lib/calendar-time.mjs",
+      "src/lib/sync/**/*.mjs",
       "src/styles/tokens.css",
       "package.json"
     ],
@@ -68,11 +73,13 @@
   "dependencies": {
     "@fontsource/gamja-flower": "^5.3.0",
     "@fontsource/poor-story": "^5.3.0",
+    "@supabase/supabase-js": "^2.118.0",
     "electron-updater": "^6.8.9",
     "svelte": "^5.57.2",
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
     "@playwright/test": "^1.64.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/node": "^26.6.5",
@@ -84,7 +91,8 @@
     "prettier-plugin-svelte": "^4.1.1",
     "svelte-check": "^4.7.7",
     "typescript": "^6.0.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "ws": "^8.22.0"
   },
   "engines": {
     "node": ">=22.13.0"

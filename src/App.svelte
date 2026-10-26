@@ -91,7 +91,6 @@
   onMount(() => {
     let disposed = false,
       cleanup: (() => void) | undefined;
-    void loadRitualDates();
     const stopRitual = window.to3mato?.onRitual((kind) => {
       if (kind === 'plan') {
         tab = 'todo';
@@ -101,7 +100,10 @@
     });
     initialize().then((fn) => {
       if (disposed) fn();
-      else cleanup = fn;
+      else {
+        cleanup = fn;
+        void loadRitualDates();
+      }
     });
     return () => {
       disposed = true;

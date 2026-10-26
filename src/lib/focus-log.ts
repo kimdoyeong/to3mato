@@ -1,5 +1,15 @@
 import { writable } from 'svelte/store';
 import type { AppState } from './types';
+import { currentSync } from './sync-context';
+import { calendarWeek } from './calendar-time.mjs';
+import {
+  openMediaDatabase,
+  queueMedia,
+  flushMedia,
+  remoteBlob,
+  mediaRevision,
+  allRows,
+} from './media-sync';
 
 export type Moment = {
   id: string;
@@ -11,6 +21,7 @@ export type Clip = Moment & { duration: number; blob: Blob; thumbnail: Blob };
 export type ClipSummary = Omit<Clip, 'blob'>;
 export const capturePrompt = writable<Moment | null>(null);
 export const logRevision = writable(0);
+mediaRevision.subscribe(() => logRevision.update((value) => value + 1));
 
 export function completedMoment(
   previous: AppState,
@@ -18,13 +29,19 @@ export function completedMoment(
 ): Moment | null {
   const timer = previous.timer;
   if (
+    next.syncContext &&
+    (next.syncContext.controller !== next.syncContext.deviceId ||
+      previous.syncContext?.owner !== next.syncContext.owner)
+  )
+    return null;
+  if (
     !timer?.running ||
     timer.phase !== 'focus' ||
     next.records.length <= previous.records.length
   )
     return null;
   const record = next.records
-    .slice(previous.records.length)
+    .filter((record) => !previous.records.some((old) => old.id === record.id))
     .find(
       (r) =>
         r.taskId === timer.taskId &&
@@ -44,51 +61,29 @@ export function completedMoment(
     : null;
 }
 
-let database: Promise<IDBDatabase> | undefined;
 export function openDatabase() {
-  return (database ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open('to3mato-focus-log', 2);
-    request.onupgradeneeded = () => {
-      for (const name of [
-        'clips',
-        'summaries',
-        'deliveries',
-        'deliveryVideos',
-      ]) {
-        if (!request.result.objectStoreNames.contains(name))
-          request.result.createObjectStore(name, { keyPath: 'id' });
-      }
-    };
-    request.onsuccess = () => {
-      request.result.onversionchange = () => {
-        request.result.close();
-        database = undefined;
-      };
-      resolve(request.result);
-    };
-    request.onerror = () => {
-      database = undefined;
-      reject(request.error);
-    };
-  }));
+  return openMediaDatabase();
 }
 export async function saveClip(clip: Clip) {
   const db = await openDatabase();
   const { blob, ...summary } = clip;
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(['clips', 'summaries'], 'readwrite');
+    const tx = db.transaction(['clips', 'summaries', 'syncQueue'], 'readwrite');
     // Svelte state can be a Proxy; IndexedDB requires a plain cloneable object.
     tx.objectStore('clips').put({ ...clip });
     tx.objectStore('summaries').put(summary);
+    const { id, thumbnail, ...fields } = summary;
+    queueMedia(tx, 'clips', id, fields, blob, thumbnail);
     tx.oncomplete = () => resolve();
     tx.onabort = () => reject(tx.error || new Error('저장 공간이 부족합니다.'));
     tx.onerror = () => reject(tx.error);
   });
   logRevision.update((value) => value + 1);
+  void flushMedia();
 }
 export async function listClips(): Promise<ClipSummary[]> {
   const db = await openDatabase();
-  return new Promise((resolve, reject) => {
+  const local: ClipSummary[] = await new Promise((resolve, reject) => {
     const request = db
       .transaction('summaries')
       .objectStore('summaries')
@@ -97,37 +92,72 @@ export async function listClips(): Promise<ClipSummary[]> {
       resolve(request.result.sort((a: Clip, b: Clip) => a.at - b.at));
     request.onerror = () => reject(request.error);
   });
+  if (!currentSync()) return local;
+  const rows = currentSync()!.extras.clips || [];
+  const pending = new Set(
+    (await allRows(db, 'syncQueue'))
+      .filter((job) => job.entity === 'clips' && !job.deleted)
+      .map((job) => job.entityId),
+  );
+  const merged = new Map(
+    local
+      .filter(
+        (row) =>
+          pending.has(row.id) || rows.some((remote) => remote.id === row.id),
+      )
+      .map((row) => [row.id, row]),
+  );
+  for (const row of rows) {
+    const cached = merged.get(row.id);
+    merged.set(row.id, {
+      ...row,
+      thumbnail:
+        cached?.thumbnail || (await remoteBlob(row.thumbnailId)) || new Blob(),
+    } as ClipSummary);
+  }
+  return [...merged.values()].sort((a, b) => a.at - b.at);
 }
 export async function readClip(id: string): Promise<Clip> {
   const db = await openDatabase();
-  return new Promise((resolve, reject) => {
+  if (
+    currentSync() &&
+    !currentSync()!.extras.clips.some((row) => row.id === id) &&
+    !(await allRows(db, 'syncQueue')).some(
+      (job) => job.entity === 'clips' && job.entityId === id && !job.deleted,
+    )
+  )
+    throw new Error('영상을 찾을 수 없습니다.');
+  const local: Clip | null = await new Promise((resolve, reject) => {
     const request = db.transaction('clips').objectStore('clips').get(id);
     request.onsuccess = () =>
-      request.result
-        ? resolve(request.result)
-        : reject(new Error('영상을 찾을 수 없습니다.'));
+      request.result ? resolve(request.result) : resolve(null);
     request.onerror = () => reject(request.error);
   });
+  if (local) return local;
+  const row = currentSync()?.extras.clips.find((row) => row.id === id);
+  if (row) {
+    const blob = await remoteBlob(row.assetId),
+      thumbnail = await remoteBlob(row.thumbnailId);
+    if (blob && thumbnail) return { ...row, blob, thumbnail } as Clip;
+  }
+  throw new Error('영상을 찾을 수 없습니다.');
 }
 export async function deleteClip(id: string) {
   const db = await openDatabase();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(['clips', 'summaries'], 'readwrite');
+    const tx = db.transaction(['clips', 'summaries', 'syncQueue'], 'readwrite');
     tx.objectStore('clips').delete(id);
     tx.objectStore('summaries').delete(id);
+    queueMedia(tx, 'clips', id, {}, undefined, undefined, true);
     tx.oncomplete = () => resolve();
     tx.onabort = () => reject(tx.error);
     tx.onerror = () => reject(tx.error);
   });
   logRevision.update((value) => value + 1);
+  void flushMedia();
 }
 export function weekBounds(offset = 0, now = new Date()) {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) + offset * 7);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
-  return { start, end };
+  return calendarWeek(offset, now);
 }
 export function mediaError(error: unknown) {
   if (error instanceof DOMException) {

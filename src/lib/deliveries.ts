@@ -10,6 +10,9 @@ import {
 import { exportWeek } from './video';
 import { now } from './client';
 import { localDate } from './domain.mjs';
+import { atCalendarTime } from './calendar-time.mjs';
+import { currentSync } from './sync-context';
+import { queueMedia, flushMedia, remoteBlob, allRows } from './media-sync';
 
 export type Delivery = {
   id: string;
@@ -26,13 +29,11 @@ export const deliveryWork = writable<{ id: string; progress: number } | null>(
 );
 export const deliveryError = writable('');
 export function deliveryTime(end: Date) {
-  const date = new Date(end);
-  date.setHours(9, 0, 0, 0);
-  return date;
+  return atCalendarTime(localDate(end), 9);
 }
 export async function listDeliveries(): Promise<Delivery[]> {
   const db = await openDatabase();
-  return new Promise((resolve, reject) => {
+  const local: Delivery[] = await new Promise((resolve, reject) => {
     const request = db
       .transaction('deliveries')
       .objectStore('deliveries')
@@ -43,47 +44,76 @@ export async function listDeliveries(): Promise<Delivery[]> {
       );
     request.onerror = () => reject(request.error);
   });
+  if (!currentSync()) return local;
+  const remote = currentSync()!.extras.deliveries;
+  const pending = new Set(
+    (await allRows(db, 'syncQueue'))
+      .filter((job) => job.entity === 'deliveries' && !job.deleted)
+      .map((job) => job.entityId),
+  );
+  const merged = new Map(
+    local
+      .filter(
+        (row) => pending.has(row.id) || remote.some((r) => r.id === row.id),
+      )
+      .map((row) => [row.id, row]),
+  );
+  for (const row of remote) merged.set(row.id, row as Delivery);
+  return [...merged.values()].sort((a, b) => b.start - a.start);
 }
 export async function readDelivery(id: string): Promise<Blob> {
   const db = await openDatabase();
-  return new Promise((resolve, reject) => {
+  const local: Blob | null = await new Promise((resolve, reject) => {
     const request = db
       .transaction('deliveryVideos')
       .objectStore('deliveryVideos')
       .get(id);
     request.onsuccess = () =>
-      request.result
-        ? resolve(request.result.blob)
-        : reject(new Error('배달된 영상을 찾을 수 없습니다.'));
+      request.result ? resolve(request.result.blob) : resolve(null);
     request.onerror = () => reject(request.error);
   });
+  if (local) return local;
+  const row = currentSync()?.extras.deliveries.find((row) => row.id === id);
+  if (row) {
+    const blob = await remoteBlob(row.assetId);
+    if (blob) return blob;
+  }
+  throw new Error('배달된 영상을 찾을 수 없습니다.');
 }
 async function saveDelivery(delivery: Delivery, blob: Blob) {
   const db = await openDatabase();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(['deliveries', 'deliveryVideos'], 'readwrite');
+    const tx = db.transaction(
+      ['deliveries', 'deliveryVideos', 'syncQueue'],
+      'readwrite',
+    );
     tx.objectStore('deliveries').put(delivery);
     tx.objectStore('deliveryVideos').put({ id: delivery.id, blob });
+    const { id, ...fields } = delivery;
+    queueMedia(tx, 'deliveries', id, { ...fields, generation: 1 }, blob);
     tx.oncomplete = () => resolve();
     tx.onabort = () => reject(tx.error);
     tx.onerror = () => reject(tx.error);
   });
   deliveries.set(await listDeliveries());
+  void flushMedia();
 }
 export async function markDeliverySeen(id: string) {
   const db = await openDatabase();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction('deliveries', 'readwrite'),
+    const tx = db.transaction(['deliveries', 'syncQueue'], 'readwrite'),
       store = tx.objectStore('deliveries');
     const request = store.get(id);
     request.onsuccess = () => {
       if (request.result) store.put({ ...request.result, seen: true });
+      queueMedia(tx, 'deliveries', id, { seen: true });
     };
     tx.oncomplete = () => resolve();
     tx.onabort = () => reject(tx.error);
     tx.onerror = () => reject(tx.error);
   });
   deliveries.set(await listDeliveries());
+  void flushMedia();
 }
 export function dueWeeks(
   clips: ClipSummary[],
