@@ -3,13 +3,14 @@ import {
   expect,
   _electron as electron,
   type Page,
+  type ElectronApplication,
 } from '@playwright/test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-const ui = test.extend<{ appPage: Page }>({
-  appPage: async ({}, use) => {
+const ui = test.extend<{ appPage: Page; app: ElectronApplication }>({
+  app: async ({}, use) => {
     const directory = await mkdtemp(
       path.join(os.tmpdir(), 'to3mato-usability-'),
     );
@@ -18,15 +19,18 @@ const ui = test.extend<{ appPage: Page }>({
     delete env.TO3MATO_DEV_URL;
     const app = await electron.launch({ args: ['.'], env });
     try {
-      const page = await app.firstWindow();
-      await expect(
-        page.getByRole('navigation', { name: '작업 영역 탭' }),
-      ).toBeVisible();
-      await use(page);
+      await use(app);
     } finally {
       await app.close();
       await rm(directory, { recursive: true, force: true });
     }
+  },
+  appPage: async ({ app }, use) => {
+    const page = await app.firstWindow();
+    await expect(
+      page.getByRole('navigation', { name: '작업 영역 탭' }),
+    ).toBeVisible();
+    await use(page);
   },
 });
 
@@ -319,5 +323,318 @@ ui(
     expect(
       (await page.evaluate(() => window.to3mato!.load())).tickets[0].voided,
     ).toBe(true);
+  },
+);
+
+ui(
+  'quick templates apply one round to the selected section and project',
+  async ({ appPage: page }) => {
+    await page.evaluate(() =>
+      window.to3mato!.dispatch({
+        type: 'template:save',
+        payload: {
+          name: '학습 묶음',
+          steps: [
+            { title: '%n%강 읽기', estimate: 1 },
+            { title: '%n%강 문제', estimate: 2 },
+          ],
+        },
+      }),
+    );
+    const tomorrow = page.getByRole('region', { name: '내일', exact: true });
+    await tomorrow.getByRole('button', { name: '템플릿', exact: true }).click();
+    await expect(
+      tomorrow.getByRole('button', { name: '템플릿', exact: true }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    await tomorrow.getByRole('button', { name: /학습 묶음/ }).click();
+    await expect(
+      tomorrow.getByRole('group', { name: '템플릿', exact: true }),
+    ).not.toBeVisible();
+    await expect(tomorrow.locator('.task-row')).toHaveCount(3);
+    const after = await page.evaluate(() => window.to3mato!.load());
+    expect(
+      after.tasks
+        .slice(-2)
+        .map((t) => [t.title, t.estimate, t.date, t.project]),
+    ).toEqual([
+      ['1강 읽기', 1, after.tasks[3].date, ''],
+      ['1강 문제', 2, after.tasks[3].date, ''],
+    ]);
+    await page.getByRole('button', { name: '프로젝트', exact: true }).click();
+    await page.getByRole('button', { name: /사이드 프로젝트/ }).click();
+    await page.getByRole('button', { name: '템플릿', exact: true }).click();
+    await page.getByRole('button', { name: /학습 묶음/ }).click();
+    expect(
+      (await page.evaluate(() => window.to3mato!.load())).tasks
+        .slice(-2)
+        .map((t) => [t.project, t.date]),
+    ).toEqual([
+      ['p1', ''],
+      ['p1', ''],
+    ]);
+  },
+);
+
+ui(
+  'template dialog saves editable steps and generates scheduled rounds without a project',
+  async ({ appPage: page }) => {
+    const today = page.getByRole('region', { name: '오늘', exact: true });
+    await today.getByRole('button', { name: '템플릿', exact: true }).click();
+    await today
+      .getByRole('button', { name: '템플릿 추가', exact: true })
+      .click();
+    const dialog = page.getByRole('dialog', { name: '여러 할 일 추가' });
+    await dialog.getByLabel('템플릿 이름').fill('학습 반복');
+    await dialog
+      .getByRole('textbox', { name: '단계 1', exact: true })
+      .fill('%n%강 읽기');
+    await dialog
+      .getByRole('button', { name: '단계 추가', exact: true })
+      .click();
+    await dialog
+      .getByRole('textbox', { name: '단계 2', exact: true })
+      .fill('%n%강 문제');
+    await dialog
+      .getByRole('group', { name: '예상 포모도로', exact: true })
+      .nth(1)
+      .getByRole('button', { name: '2', exact: true })
+      .click();
+    await dialog
+      .getByRole('button', { name: '템플릿으로 저장', exact: true })
+      .click();
+    await expect(
+      dialog.getByRole('button', { name: '학습 반복', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await dialog.getByLabel('회차', { exact: true }).fill('3');
+    await dialog.getByLabel('시작일').fill('2026-10-27');
+    await dialog.getByRole('button', { name: '화요일 배치' }).click();
+    await dialog.getByRole('button', { name: '목요일 배치' }).click();
+    await expect(dialog.locator('.template-preview')).toContainText('외 2개');
+    await page.screenshot({ path: 'test-results/stage3-template.png' });
+    await dialog.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    const after = await page.evaluate(() => window.to3mato!.load());
+    expect(after.templates).toHaveLength(1);
+    expect(
+      after.tasks
+        .slice(-6)
+        .map((t) => [t.title, t.estimate, t.date, t.project]),
+    ).toEqual([
+      ['1강 읽기', 1, '2026-10-28', ''],
+      ['1강 문제', 2, '2026-10-28', ''],
+      ['2강 읽기', 1, '2026-10-30', ''],
+      ['2강 문제', 2, '2026-10-30', ''],
+      ['3강 읽기', 1, '2026-11-02', ''],
+      ['3강 문제', 2, '2026-11-02', ''],
+    ]);
+    await page.reload();
+    expect(
+      (await page.evaluate(() => window.to3mato!.load())).templates,
+    ).toEqual(after.templates);
+  },
+);
+
+ui(
+  'diary saves selected live tickets as a template and excludes voided tickets',
+  async ({ appPage: page }) => {
+    await page.evaluate(async () => {
+      await window.to3mato!.dispatch({
+        type: 'task:toggle',
+        payload: { id: 't1' },
+      });
+      await window.to3mato!.dispatch({
+        type: 'task:toggle',
+        payload: { id: 't4' },
+      });
+      await window.to3mato!.dispatch({
+        type: 'task:toggle',
+        payload: { id: 't4' },
+      });
+    });
+    await page.getByRole('button', { name: '프로젝트', exact: true }).click();
+    await page.getByRole('button', { name: /사이드 프로젝트/ }).click();
+    await page
+      .getByRole('button', { name: '템플릿으로 저장', exact: true })
+      .click();
+    const dialog = page.getByRole('dialog', { name: '템플릿으로 저장' });
+    await expect(dialog.getByRole('checkbox')).toHaveCount(1);
+    await expect(dialog.getByRole('checkbox')).toBeChecked();
+    await dialog.getByLabel('템플릿 이름').fill('완료 묶음');
+    await dialog.getByRole('button', { name: '저장', exact: true }).click();
+    expect(
+      (await page.evaluate(() => window.to3mato!.load())).templates[0],
+    ).toMatchObject({
+      name: '완료 묶음',
+      steps: [{ title: '프로젝트 아이디어 정리', estimate: 2 }],
+    });
+  },
+);
+
+ui(
+  'plan card carries yesterday tasks, archives, deletes and remembers dismissal',
+  async ({ appPage: page }) => {
+    const dates = await page.evaluate(async () => {
+      const d = new Date();
+      const local = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const today = local(d);
+      d.setDate(d.getDate() - 1);
+      const yesterday = local(d);
+      for (const id of ['t1', 't2', 't3'])
+        await window.to3mato!.dispatch({
+          type: 'task:move',
+          payload: { id, date: yesterday },
+        });
+      await window.to3mato!.dispatch({
+        type: 'settings:save',
+        payload: { planAt: '00:00' },
+      });
+      return { today, yesterday };
+    });
+    const plan = page.getByRole('region', { name: '계획 시작', exact: true });
+    await expect(plan).toBeVisible();
+    await page.screenshot({
+      path: 'test-results/stage3-plan.png',
+      fullPage: true,
+    });
+    await plan
+      .locator('.ritual-task')
+      .filter({ hasText: '프로젝트 아이디어 정리' })
+      .getByRole('button', { name: '오늘로', exact: true })
+      .click();
+    await plan
+      .locator('.ritual-task')
+      .filter({ hasText: '디자인 강의 수강' })
+      .getByRole('button', { name: '보관', exact: true })
+      .click();
+    await plan
+      .locator('.ritual-task')
+      .filter({ hasText: '도서 읽기' })
+      .getByRole('button', { name: '삭제', exact: true })
+      .click();
+    await expect(plan).toContainText('어제 미완료 할 일이 없습니다.');
+    await plan
+      .locator('.ritual-task')
+      .filter({ hasText: '주간 할 일 정리' })
+      .getByRole('button', { name: '오늘에 배치' })
+      .click();
+    await plan
+      .getByRole('button', { name: '오늘 가능 +', exact: true })
+      .click();
+    await plan.getByRole('button', { name: '닫기', exact: true }).click();
+    await expect(plan).not.toBeVisible();
+    await page.reload();
+    await expect(plan).not.toBeVisible();
+    const after = await page.evaluate(() => window.to3mato!.load());
+    expect(after.tasks.find((t) => t.id === 't1')?.date).toBe(dates.today);
+    expect(after.tasks.find((t) => t.id === 't2')?.date).toBe('');
+    expect(after.tasks.find((t) => t.id === 't3')).toBeUndefined();
+    expect(after.tasks.find((t) => t.id === 't5')?.date).toBe(dates.today);
+    expect(after.settings.dailyCapacity).toBe(9);
+    expect(
+      await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('to3mato-rituals-v1')!),
+      ),
+    ).toMatchObject({ plannedDate: dates.today });
+  },
+);
+
+ui(
+  'ritual IPC opens the correct screen and starting focus closes the plan card',
+  async ({ appPage: page, app }) => {
+    await page.getByRole('button', { name: '설정', exact: true }).click();
+    const mainWindow = await app.browserWindow(page);
+    await mainWindow.evaluate((window) =>
+      window.webContents.send('ritual:open', 'plan'),
+    );
+    const plan = page.getByRole('region', { name: '계획 시작', exact: true });
+    await expect(plan).toBeVisible();
+    await page
+      .getByRole('complementary', { name: '실행 영역' })
+      .getByRole('button', { name: '프로젝트 아이디어 정리 시작' })
+      .click();
+    await expect(plan).not.toBeVisible();
+    expect(
+      await page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem('to3mato-rituals-v1')!).plannedDate,
+      ),
+    ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await mainWindow.evaluate((window) =>
+      window.webContents.send('ritual:open', 'review'),
+    );
+    await expect(
+      page.getByRole('heading', { name: '돌아보기', exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('#clock')).toBeVisible();
+  },
+);
+
+ui(
+  'review processes unfinished work, keeps tomorrow capacity and saves its local date',
+  async ({ appPage: page }) => {
+    await page.getByRole('button', { name: '설정', exact: true }).click();
+    await page.getByLabel('계획 시각', { exact: true }).fill('09:30');
+    await page.getByLabel('돌아보기 시각', { exact: true }).fill('18:30');
+    await page.getByRole('button', { name: '토요일 배치' }).click();
+    await page.getByRole('button', { name: '돌아보기', exact: true }).click();
+    const pending = page.getByRole('region', { name: /^미완료/ });
+    await expect(pending).toBeVisible();
+    await page.screenshot({
+      path: 'test-results/stage3-review.png',
+      fullPage: true,
+    });
+    await pending
+      .locator('.ritual-task')
+      .filter({ hasText: '프로젝트 아이디어 정리' })
+      .getByRole('button', { name: '내일로', exact: true })
+      .click();
+    await pending
+      .locator('.ritual-task')
+      .filter({ hasText: '디자인 강의 수강' })
+      .getByRole('button', { name: '보관', exact: true })
+      .click();
+    await pending
+      .locator('.ritual-task')
+      .filter({ hasText: '도서 읽기' })
+      .getByRole('button', { name: '완료', exact: true })
+      .click();
+    await expect(pending).toContainText('미완료 할 일이 없습니다.');
+    await expect(page.locator('.review-table')).toContainText('-1');
+    await page
+      .getByRole('button', { name: '내일 가능 −', exact: true })
+      .click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: '돌아보기', exact: true }),
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: '돌아보기', exact: true }),
+    ).toBeFocused();
+    const after = await page.evaluate(() => window.to3mato!.load());
+    expect(after.tasks.find((t) => t.id === 't1')?.date).toBe(
+      after.tasks.find((t) => t.id === 't4')?.date,
+    );
+    expect(after.tasks.find((t) => t.id === 't2')?.date).toBe('');
+    expect(after.tasks.find((t) => t.id === 't3')?.done).toBe(true);
+    expect(after.tickets).toHaveLength(1);
+    expect(after.settings).toMatchObject({
+      dailyCapacity: 7,
+      planAt: '09:30',
+      reviewAt: '18:30',
+      remindDays: [1, 2, 3, 4, 5, 6],
+    });
+    expect(
+      await page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem('to3mato-rituals-v1')!).reviewedDate,
+      ),
+    ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await page.getByLabel('계획 시각', { exact: true }).fill('');
+    await page.getByLabel('돌아보기 시각', { exact: true }).fill('');
+    await page.reload();
+    expect(
+      (await page.evaluate(() => window.to3mato!.load())).settings,
+    ).toMatchObject({ planAt: '', reviewAt: '', dailyCapacity: 7 });
   },
 );

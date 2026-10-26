@@ -13,6 +13,9 @@
   import { localDate, usedPomodoros } from './lib/domain.mjs';
   import type { Project, Task } from './lib/types';
   import Icon from './components/Icon.svelte';
+  import ReviewView from './components/ReviewView.svelte';
+  import { planOpen, ritualDates } from './lib/ritual-state';
+  import { planIsDue } from './lib/rituals.mjs';
   import TodoView from './components/TodoView.svelte';
   import ProjectsView from './components/ProjectsView.svelte';
   import CalendarView from './components/CalendarView.svelte';
@@ -39,6 +42,20 @@
     calendarWeek = $state(0);
   let taskError = $state(''),
     projectError = $state('');
+  let reviewOpen = $state(false);
+  $effect(() => {
+    if ($ready && planIsDue($appState.settings, $now, $ritualDates.plannedDate))
+      planOpen.set(true);
+  });
+  async function closeReview() {
+    reviewOpen = false;
+    await tick();
+    document
+      .querySelector<HTMLButtonElement>(
+        tab === 'settings' ? '[data-open-review]' : '.tab.active',
+      )
+      ?.focus();
+  }
   let tab = $state('todo'),
     taskDialog: HTMLDialogElement,
     projectDialog: HTMLDialogElement;
@@ -65,6 +82,13 @@
   onMount(() => {
     let disposed = false,
       cleanup: (() => void) | undefined;
+    const stopRitual = window.to3mato?.onRitual((kind) => {
+      if (kind === 'plan') {
+        tab = 'todo';
+        reviewOpen = false;
+        planOpen.set(true);
+      } else if (kind === 'review') reviewOpen = true;
+    });
     initialize().then((fn) => {
       if (disposed) fn();
       else cleanup = fn;
@@ -72,6 +96,7 @@
     return () => {
       disposed = true;
       cleanup?.();
+      stopRitual?.();
     };
   });
   async function openTask(
@@ -176,36 +201,41 @@
             class="tab"
             class:active={tab === id}
             aria-current={tab === id ? 'page' : undefined}
-            onclick={() => (tab = id)}><Icon name={icon} />{label}</button
+            onclick={() => {
+              tab = id;
+              reviewOpen = false;
+            }}><Icon name={icon} />{label}</button
           >{/each}
       </nav>
       <section class="workspace" aria-label="작업 영역">
-        <div class="workspace-heading">
-          <span id="date-label"
-            >{new Date($now).toLocaleDateString('ko-KR', {
-              month: 'long',
-              day: 'numeric',
-              weekday: 'short',
-            })}</span
-          >
-        </div>
-        {#if tab === 'todo'}<TodoView onedit={(task) => openTask(task)} />
-        {:else if tab === 'projects'}<ProjectsView
-            bind:selected={selectedProject}
-            onedit={(task) => openTask(task)}
-            onadd={(id) => openTask(null, localDate(), id)}
-            onproject={() => openProject()}
-            oneditproject={(project) => openProject(project)}
-            onlog={() => (tab = 'log')}
-          />
-        {:else if tab === 'calendar'}<CalendarView
-            bind:selected={calendarDate}
-            bind:week={calendarWeek}
-            onedit={(task) => openTask(task)}
-            onadd={(date) => openTask(null, date)}
-          />
-        {:else if tab === 'log'}<FocusLog />
-        {:else}<SettingsView />{/if}
+        {#if reviewOpen}<ReviewView onclose={closeReview} />{:else}
+          <div class="workspace-heading">
+            <span id="date-label"
+              >{new Date($now).toLocaleDateString('ko-KR', {
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short',
+              })}</span
+            >
+          </div>
+          {#if tab === 'todo'}<TodoView onedit={(task) => openTask(task)} />
+          {:else if tab === 'projects'}<ProjectsView
+              bind:selected={selectedProject}
+              onedit={(task) => openTask(task)}
+              onadd={(id) => openTask(null, localDate(), id)}
+              onproject={() => openProject()}
+              oneditproject={(project) => openProject(project)}
+              onlog={() => (tab = 'log')}
+            />
+          {:else if tab === 'calendar'}<CalendarView
+              bind:selected={calendarDate}
+              bind:week={calendarWeek}
+              onedit={(task) => openTask(task)}
+              onadd={(date) => openTask(null, date)}
+            />
+          {:else if tab === 'log'}<FocusLog />
+          {:else}<SettingsView onreview={() => (reviewOpen = true)} />{/if}
+        {/if}
       </section>
     </div>
     <ExecutionPanel />

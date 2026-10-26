@@ -10,6 +10,8 @@
     importNative,
     importBrowser,
   } from '../lib/client';
+  import WeekdayPicker from './WeekdayPicker.svelte';
+  let { onreview }: { onreview: () => void } = $props();
   import Tomato from './Tomato.svelte';
   let input: HTMLInputElement;
   let version = $state('');
@@ -59,6 +61,33 @@
       notify('다음 포모도로부터 적용됩니다.');
   }
 </script>
+
+<section class="settings-card" aria-labelledby="reminder-title">
+  <h2 id="reminder-title">알림</h2>
+  <div class="setting-row">
+    <label for="plan-time">계획 시각</label><input
+      id="plan-time"
+      type="time"
+      value={$appState.settings.planAt}
+      onchange={(event) =>
+        send('settings:save', { planAt: event.currentTarget.value })}
+    />
+  </div>
+  <div class="setting-row">
+    <label for="review-time">돌아보기 시각</label><input
+      id="review-time"
+      type="time"
+      value={$appState.settings.reviewAt}
+      onchange={(event) =>
+        send('settings:save', { reviewAt: event.currentTarget.value })}
+    />
+  </div>
+  <WeekdayPicker
+    value={$appState.settings.remindDays}
+    onchange={(remindDays) => send('settings:save', { remindDays })}
+  />
+  <button class="btn-line" data-open-review onclick={onreview}>돌아보기</button>
+</section>
 
 <section class="settings-card">
   <h2>포모도로 설정</h2>

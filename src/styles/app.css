@@ -1073,3 +1073,210 @@ dialog .field {
     flex-wrap: wrap;
   }
 }
+
+.plan-card {
+  padding: 22px 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.ritual-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ritual-heading > h1,
+.ritual-heading > h2 {
+  margin: 0 auto 0 0;
+}
+.ritual-heading h1 {
+  font-size: 36px;
+}
+.ritual-heading h2 {
+  font-size: 30px;
+}
+.ritual-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ritual-section h2 {
+  align-self: flex-start;
+}
+.ritual-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 22px;
+}
+.ritual-section p {
+  margin: 0;
+}
+.ritual-task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.ritual-task.backlog {
+  border-style: dashed;
+}
+.ritual-task-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+.ritual-task-title > span:first-child {
+  font-size: 18px;
+}
+.ritual-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ritual-task-actions .btn-text {
+  padding: 5px 7px;
+}
+.plan-card .capacity-row {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0 0 0 40px;
+}
+.plan-card .capacity-row .tape {
+  display: none;
+}
+.plan-card .capacity-figures {
+  flex-wrap: wrap;
+  gap: 5px 12px;
+}
+.review-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.review-view h2 {
+  font-size: 28px;
+  margin: 0;
+}
+.review-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 24px;
+  flex-wrap: wrap;
+}
+.review-summary .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.review-summary .stat b {
+  font-size: 36px;
+  font-weight: 400;
+}
+.review-summary .stat small {
+  color: var(--muted);
+}
+.review-mascot {
+  width: 64px;
+}
+.review-summary .review-mascot .tomato-illustration {
+  width: 64px;
+  height: 60px;
+  margin: 0;
+}
+.review-stamps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-left: auto;
+  max-width: 45%;
+}
+.review-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  table-layout: fixed;
+}
+.review-table th {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 14px;
+  padding: 4px;
+}
+.review-table th:first-child {
+  width: 54%;
+}
+.review-table th:last-child {
+  width: 9%;
+}
+.review-table td {
+  padding: 12px 5px;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+.review-table td:first-child {
+  border-left: 1px solid var(--line);
+  border-radius: 18px 0 0 16px;
+  text-align: left;
+  padding-left: 10px;
+}
+.review-table td:last-child {
+  border-right: 1px solid var(--line);
+  border-radius: 0 16px 18px 0;
+}
+.review-task-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.review-task-name .done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.review-table .over {
+  color: var(--red-deep);
+}
+.review-table .saved {
+  color: var(--green);
+}
+.settings-card .setting-row input[type='time'] {
+  max-width: 170px;
+}
+.settings-card .weekday-field {
+  margin-top: 22px;
+}
+@media (max-width: 1100px) {
+  .plan-card {
+    padding: 20px 16px;
+  }
+  .ritual-task {
+    flex-wrap: wrap;
+  }
+  .ritual-task-actions {
+    margin-left: auto;
+  }
+  .ritual-task-title {
+    flex-basis: 65%;
+  }
+  .review-table th:first-child {
+    width: 46%;
+  }
+  .review-mascot {
+    display: none;
+  }
+}
+
+.review-heading {
+  scroll-margin-top: 24px;
+}

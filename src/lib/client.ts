@@ -8,6 +8,7 @@ import {
   localDate,
 } from './domain.mjs';
 import type { AppState, Command } from './types';
+import { finishRitual } from './ritual-state';
 import { capturePrompt, completedMoment } from './focus-log';
 export const state = writable<AppState>(createInitialState());
 export const now = writable(Date.now());
@@ -23,7 +24,18 @@ export function notify(text: string) {
 }
 const key = 'to3mato-state-v1';
 function receiveState(next: AppState) {
-  const moment = completedMoment(get(state), next);
+  const previous = get(state);
+  const moment = completedMoment(previous, next);
+  if (
+    next.timer?.phase === 'focus' &&
+    next.timer.running &&
+    (!previous.timer?.running ||
+      previous.timer.phase !== 'focus' ||
+      previous.timer.taskId !== next.timer.taskId ||
+      previous.timer.startedAt !== next.timer.startedAt)
+  ) {
+    finishRitual('plan');
+  }
   state.set(next);
   if (moment) capturePrompt.set(moment);
 }

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import PlanCard from './PlanCard.svelte';
+  import { planOpen } from '../lib/ritual-state';
   import TaskList from './TaskList.svelte';
   import QuickAdd from './QuickAdd.svelte';
   import CapacityRow from './parts/CapacityRow.svelte';
@@ -33,6 +35,7 @@
 </script>
 
 <div class="todo-sections">
+  {#if $planOpen}<PlanCard />{/if}
   {#each sections as section, index (section.date)}
     <section
       class="todo-section"
