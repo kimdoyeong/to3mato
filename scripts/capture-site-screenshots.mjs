@@ -56,7 +56,8 @@ state.timer = {
   taskId: 't1',
   phase: 'focus',
   duration: 1500,
-  elapsed: 300,
+  // Far enough into the session that the 3D tomato plant carries fruit.
+  elapsed: 1290,
   startedAt: Date.now(),
   running: false,
 };
@@ -89,26 +90,25 @@ try {
     console.log('Captured ' + name);
   };
   await page.evaluate(() => window.to3mato.dispatch({ type: 'timer:toggle' }));
+  await page.locator('.tomato-growth[data-ready="true"]').waitFor();
   await shot('app-today');
   await page.getByRole('button', { name: '프로젝트', exact: true }).click();
-  await page
-    .locator('.project-card')
-    .filter({ hasText: '개인 웹사이트' })
-    .click();
+  const openProject = () =>
+    page
+      .getByRole('button', { name: /개인 웹사이트/ })
+      .first()
+      .click();
+  await openProject();
   await shot('app-project');
   await page.getByRole('button', { name: '캘린더', exact: true }).click();
   await shot('app-calendar');
   await page.getByRole('button', { name: '프로젝트', exact: true }).click();
   if (
-    await page
-      .locator('.project-card')
-      .filter({ hasText: '개인 웹사이트' })
-      .count()
+    !(await page
+      .getByRole('button', { name: '할 일 추가', exact: true })
+      .count())
   )
-    await page
-      .locator('.project-card')
-      .filter({ hasText: '개인 웹사이트' })
-      .click();
+    await openProject();
   await page.getByRole('button', { name: '할 일 추가', exact: true }).click();
   await page.getByRole('button', { name: '여러 개 추가', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '여러 할 일 추가' });
@@ -141,6 +141,7 @@ try {
   await page
     .getByRole('region', { name: '인증샷 제안' })
     .waitFor({ timeout: 15000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await shot('app-capture-prompt');
   await writeFile(
     path.resolve('website/capture.json'),
