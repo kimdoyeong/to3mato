@@ -23,7 +23,7 @@
 
 서명 없는 테스트 패키지는 배포하지 않는다. 여러 릴리스 브랜치의 R2·Pages 배포는 같은 작업과 동시 실행 제한 안에서 직렬화한다. 이전 버전의 느린 작업이 더 최신 피드를 덮어쓰지 못하도록 업로드 직전에도 원격 버전을 확인한다. 같은 버전의 파일은 정확히 같은 바이트일 때만 재전송할 수 있다.
 
-사이트 생성은 `SITE_RELEASE_DIR=release/distribution npm run site:prepare`를 사용한다. 저장소의 HTML은 템플릿으로 유지하고 출력 폴더의 다운로드 정보만 갱신한다. 기존 소개·변경 내역 문구는 유지한다. Pages에는 설치 파일을 넣지 않고 검증된 R2 주소를 연결한다. 독립적인 사이트 배포는 `site:deploy`를 사용할 수 있다.
+사이트 생성은 `SITE_RELEASE_DIR=release/distribution npm run site:prepare`를 사용한다. 저장소의 HTML은 템플릿으로 유지하고 출력 폴더의 다운로드 정보만 갱신한다. 소개 문구는 유지한다. 변경 내역(`download.html`의 `release-notes` 블록)은 자동 생성하지 않으므로 릴리스 브랜치에서 직접 갱신한다. 문체와 승인 절차는 `AGENTS.md`의 "변경 내역" 절을 따른다. Pages에는 설치 파일을 넣지 않고 검증된 R2 주소를 연결한다. 독립적인 사이트 배포는 `site:deploy`를 사용할 수 있다.
 
 ## GitHub Secrets
 
@@ -47,7 +47,7 @@ Apple 계정과 앱 전용 암호는 Mac의 터미널에서 `python3 scripts/reg
 
 ## 릴리스 절차
 
-1. 검증할 변경을 포함하고 `npm version 0.3.2 --no-git-tag-version`처럼 새 버전을 지정한다. 버전은 예시이며 실제 다음 버전을 사용한다.
+1. 검증할 변경을 포함하고 `npm version 0.3.2 --no-git-tag-version`처럼 새 버전을 지정한다. 버전은 예시이며 실제 다음 버전을 사용한다. 같은 브랜치에서 다운로드 페이지의 변경 내역을 새 버전으로 갱신하고 `tests/site-release.test.mjs`의 첫 줄 확인도 맞춘다. 변경 내역 문구는 사용자 승인을 받은 뒤 커밋한다.
 2. `release/0.3.2` 브랜치에 해당 변경과 버전 파일을 커밋한다.
 3. `git push -u origin release/0.3.2`로 자동화를 시작한다. 검증을 통과하면 R2의 정식 업데이트 피드가 바뀐다.
 4. Actions에서 네 작업의 성공과 공개 업데이트 피드·다운로드 웹페이지의 버전, 링크, 체크섬을 확인한다.
