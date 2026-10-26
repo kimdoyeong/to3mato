@@ -1,10 +1,13 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { growth, fruitScale } from './growth.mjs';
+import {
+  loadFarm,
+  groundAt,
+  worldVertices,
+  boxCorners,
+  fitCamera,
+} from './farm-assets';
 
-// Models and the shared gradient atlas come from the Farm Pack. The glTF
-// files carry UVs but no texture, so every mesh gets the atlas here.
-const BASE = `${import.meta.env.BASE_URL}models/farm/`;
 const MODELS = {
   sprout: 'SM_TomatoPlant_1_A',
   tall: 'SM_TomatoPlant_2_A',
@@ -12,55 +15,13 @@ const MODELS = {
   island: 'SM_GrassIsland_A_1',
   grass: 'SM_Grass_1_A',
   pebble: 'SM_Pebles_1_A',
-} as const;
-type ModelName = keyof typeof MODELS;
+};
 // Pointer shake: push per canvas width crossed, spring stiffness, damping
 // per second and the largest sideways bend at the top of a grown plant.
 const PUSH = 3;
 const STIFFNESS = 60;
 const DAMPING = 4;
 const MAX_BEND = 0.25;
-type Assets = {
-  material: THREE.Material;
-  models: Record<ModelName, THREE.Object3D>;
-};
-
-let assets: Promise<Assets> | null = null;
-
-// Loaded once and kept for the app's lifetime; each scene clones from it.
-function loadAssets() {
-  assets ??= (async () => {
-    const map = await new THREE.TextureLoader().loadAsync(
-      `${BASE}farm-atlas.png`,
-    );
-    map.flipY = false;
-    map.colorSpace = THREE.SRGBColorSpace;
-    const material = new THREE.MeshLambertMaterial({
-      map,
-      side: THREE.DoubleSide,
-    });
-    const loader = new GLTFLoader();
-    const entries = await Promise.all(
-      Object.entries(MODELS).map(async ([key, file]) => {
-        const { scene } = await loader.loadAsync(`${BASE}${file}.glb`);
-        scene.traverse((child) => {
-          if (!(child instanceof THREE.Mesh)) return;
-          child.userData.fruit = child.material.name === 'M_Metalic_3_Farm';
-          child.material = material;
-          child.castShadow = true;
-          child.receiveShadow = true;
-        });
-        return [key, scene] as const;
-      }),
-    );
-    return {
-      material,
-      models: Object.fromEntries(entries) as unknown as Assets['models'],
-    };
-  })();
-  assets.catch(() => (assets = null));
-  return assets;
-}
 
 // The fruit of SM_TomatoPlant_2_B is one mesh. Split it into separate
 // tomatoes (connected pieces, welded by position) so each can grow alone.
@@ -167,7 +128,7 @@ export type TomatoScene = {
 export async function createTomatoScene(
   host: HTMLElement,
 ): Promise<TomatoScene> {
-  const { material, models } = await loadAssets();
+  const { material, models } = await loadFarm(MODELS);
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -192,24 +153,15 @@ export async function createTomatoScene(
   const island = models.island.clone();
   island.scale.setScalar(0.62);
   scene.add(island);
-  island.updateMatrixWorld(true);
   // The plant stands where the island's surface is under its centre.
-  const ray = new THREE.Raycaster(
-    new THREE.Vector3(0, 5, 0),
-    new THREE.Vector3(0, -1, 0),
-  );
-  const ground = ray.intersectObject(island, true)[0]?.point.y ?? 0;
+  const ground = groundAt(island, 0, 0);
   for (const [x, z, r] of [
     [0.34, 0.26, 0.4],
     [-0.36, 0.1, 2.1],
     [0.12, -0.32, 4],
   ]) {
     const grass = models.grass.clone();
-    const y = new THREE.Raycaster(
-      new THREE.Vector3(x, 5, z),
-      new THREE.Vector3(0, -1, 0),
-    ).intersectObject(island, true)[0]?.point.y;
-    grass.position.set(x, y ?? ground, z);
+    grass.position.set(x, groundAt(island, x, z, ground), z);
     grass.rotation.y = r;
     grass.scale.setScalar(0.9);
     scene.add(grass);
@@ -249,66 +201,11 @@ export async function createTomatoScene(
   // The camera frames the island and the fully grown plant (with room for
   // the stage pop) from a fixed angle, so nothing is cut at any canvas size.
   scene.updateMatrixWorld(true);
-  const points: THREE.Vector3[] = [];
-  island.traverse((child) => {
-    if (!(child instanceof THREE.Mesh)) return;
-    const position = child.geometry.getAttribute('position');
-    for (let i = 0; i < position.count; i++)
-      points.push(
-        new THREE.Vector3()
-          .fromBufferAttribute(position, i)
-          .applyMatrix4(child.matrixWorld),
-      );
-  });
   const grown = new THREE.Box3().setFromObject(stages.fruit);
   grown.max.y = ground + (grown.max.y - ground) * 1.08;
   grown.expandByVector(new THREE.Vector3(MAX_BEND / 2, 0, MAX_BEND / 2));
-  for (const x of [grown.min.x, grown.max.x])
-    for (const y of [grown.min.y, grown.max.y])
-      for (const z of [grown.min.z, grown.max.z])
-        points.push(new THREE.Vector3(x, y, z));
+  const points = [...worldVertices(island), ...boxCorners(grown)];
   const view = new THREE.Vector3(2.7, 2.2, 3.8).normalize();
-  const MARGIN = 0.9;
-
-  function fit() {
-    const target = new THREE.Box3()
-      .setFromPoints(points)
-      .getCenter(new THREE.Vector3());
-    const point = new THREE.Vector3();
-    const place = (distance: number) => {
-      camera.position.copy(target).addScaledVector(view, distance);
-      camera.lookAt(target);
-      camera.updateMatrixWorld();
-      const extent = new THREE.Box2();
-      for (const p of points) {
-        point.copy(p).project(camera);
-        extent.expandByPoint(new THREE.Vector2(point.x, point.y));
-      }
-      return extent;
-    };
-    for (let pass = 0; pass < 4; pass++) {
-      let near = 2;
-      let far = 20;
-      for (let i = 0; i < 20; i++) {
-        const mid = (near + far) / 2;
-        const { min, max } = place(mid);
-        if (Math.max(-min.x, max.x, -min.y, max.y) > MARGIN) near = mid;
-        else far = mid;
-      }
-      const { min, max } = place(far);
-      if (pass === 3) break;
-      // Shift the aim so opposite margins match, then fit again.
-      const half = far * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-      const right = new THREE.Vector3().setFromMatrixColumn(
-        camera.matrixWorld,
-        0,
-      );
-      const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
-      target
-        .addScaledVector(right, ((min.x + max.x) / 2) * half * camera.aspect)
-        .addScaledVector(up, ((min.y + max.y) / 2) * half);
-    }
-  }
 
   const resize = () => {
     const { clientWidth: w, clientHeight: h } = host;
@@ -316,7 +213,7 @@ export async function createTomatoScene(
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    fit();
+    fitCamera(camera, points, view, 0.9);
     render();
   };
   const observer = new ResizeObserver(resize);

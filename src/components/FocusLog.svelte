@@ -19,8 +19,10 @@
     markDeliverySeen,
     type Delivery,
   } from '../lib/deliveries';
-  import { notify, now } from '../lib/client';
+  import { notify, now, state as appState } from '../lib/client';
   import { localDate } from '../lib/domain.mjs';
+  import { forestItems } from '../lib/forest.mjs';
+  import ForestIsland from './ForestIsland.svelte';
   let week = $state(0),
     clips = $state<ClipSummary[]>([]),
     error = $state(''),
@@ -37,6 +39,16 @@
     clips.filter(
       (clip) =>
         clip.at >= bounds.start.getTime() && clip.at < bounds.end.getTime(),
+    ),
+  );
+  const forest = $derived(
+    forestItems(
+      $appState.records.filter(
+        (record) =>
+          record.at >= bounds.start.getTime() &&
+          record.at < bounds.end.getTime(),
+      ),
+      $appState.settings.rest,
     ),
   );
   const lastDay = $derived(new Date(bounds.end.getTime() - 1));
@@ -235,6 +247,7 @@
         onclick={() => (week = 0)}>이번 주</button
       >{/if}
   </div>
+  <ForestIsland items={forest} />
   {#if error}<p class="form-error" role="alert">{error}</p>{/if}
   {#if loading}<p role="status">불러오는 중</p>
   {:else if !selected.length}<div class="log-empty">
