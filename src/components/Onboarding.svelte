@@ -41,7 +41,11 @@
   let account = $state<AccountStatus | null>(null);
   onMount(() => {
     let disposed = false;
-    const stop = window.to3mato?.account.subscribe((value) => (account = value));
+    // Returns nothing: a returned Svelte state proxy cannot cross the
+    // preload bridge and would throw inside the IPC listener.
+    const stop = window.to3mato?.account.subscribe((value) => {
+      account = value;
+    });
     onboardingPending()
       .then(async (pending) => {
         if (!pending || disposed) return;
@@ -146,7 +150,7 @@
         <p class="onboarding-body">
           연동하면 다른 기기와 동기화되어 사용하실 수 있습니다.
         </p>
-        <AuthForm id="onboarding" onverified={(status) => (account = status)} />
+        <AuthForm id="onboarding" />
       {:else}
         <p class="onboarding-body">{account.user.email}</p>
         {#if !account.enabled}<p class="onboarding-body">
@@ -154,7 +158,12 @@
           </p>{/if}
       {/if}
     {/if}
-    {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+    {#if error || (step === last && !account?.user && account?.error)}<p
+        class="form-error"
+        role="alert"
+      >
+        {error || account?.error}
+      </p>{/if}
     </div>
     <div class="onboarding-footer">
       {#if step < last}

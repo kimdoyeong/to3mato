@@ -553,11 +553,17 @@ if (!app.requestSingleInstanceLock()) {
           },
           onStatus: (value) =>
             window?.webContents.send('account:status', value),
+          // The email link finishes in the browser. Bring the app back.
+          onSignedIn: () => {
+            if (!window) return;
+            if (window.isMinimized()) window.restore();
+            window.show();
+            app.focus({ steal: true });
+          },
         });
         const accountMethods = {
           status: () => account.status(),
-          requestCode: (email) => account.requestCode(email),
-          verify: (email, code) => account.verify(email, code),
+          requestLink: (email) => account.requestLink(email),
           enable: () => {
             store.snapshot(
               path.join(app.getPath('userData'), 'to3mato.pre-sync.sqlite3'),

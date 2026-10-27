@@ -30,6 +30,7 @@ test('two Macs and browser share tasks, timer and media with optional sync', asy
         TO3MATO_SUPABASE_URL: server.url,
         TO3MATO_SUPABASE_PUBLISHABLE_KEY: 'test',
         TO3MATO_SYNC_TEST: '1',
+        TO3MATO_AUTH_CALLBACK_PORT: '0',
       };
       delete env.ELECTRON_RUN_AS_NODE;
       delete env.TO3MATO_DEV_URL;
@@ -49,10 +50,16 @@ test('two Macs and browser share tasks, timer and media with optional sync', asy
       ).toBeVisible();
       await page.getByLabel('이메일', { exact: true }).fill('a@example.test');
       await page
-        .getByRole('button', { name: '인증 코드 받기', exact: true })
+        .getByRole('button', { name: '로그인 링크 받기', exact: true })
         .click();
-      await page.getByLabel('인증 코드', { exact: true }).fill('123456');
-      await page.getByRole('button', { name: '로그인', exact: true }).click();
+      await expect(
+        page.getByText(
+          '로그인 링크를 보냈습니다. 이 컴퓨터에서 메일의 링크를 여세요.',
+        ),
+      ).toBeVisible();
+      // Opening the emailed link in a browser on this computer.
+      const opened = await fetch(server.linkFor('a@example.test'));
+      expect(await opened.text()).toContain('로그인했습니다.');
       await expect(
         page.getByRole('button', { name: '연동', exact: true }),
       ).toBeVisible();
@@ -337,6 +344,7 @@ test('two Macs and browser share tasks, timer and media with optional sync', asy
       TO3MATO_SUPABASE_URL: server.url,
       TO3MATO_SUPABASE_PUBLISHABLE_KEY: 'test',
       TO3MATO_SYNC_TEST: '1',
+      TO3MATO_AUTH_CALLBACK_PORT: '0',
     };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.TO3MATO_DEV_URL;
@@ -357,7 +365,17 @@ test('two Macs and browser share tasks, timer and media with optional sync', asy
     ).toBe(true);
     await restored.evaluate(async () => {
       await window.to3mato!.account.logout();
-      await window.to3mato!.account.verify('b@example.test', '123456');
+      await window.to3mato!.account.requestLink('b@example.test');
+    });
+    await fetch(server.linkFor('b@example.test'));
+    await expect
+      .poll(
+        async () =>
+          (await restored.evaluate(() => window.to3mato!.account.status()))
+            .user?.email,
+      )
+      .toBe('b@example.test');
+    await restored.evaluate(async () => {
       await window.to3mato!.account.enable();
       await window.to3mato!.account.syncNow();
     });

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createAuth, supabaseConfiguration } from './auth.mjs';
+import { startCallbackServer, callbackPort } from './auth-callback.mjs';
 import { openAccountRepository, accountDirectory } from './sync-repository.mjs';
 import { createSyncEngine, createClock } from '../src/lib/sync/engine.mjs';
 import { createSupabaseTransport } from '../src/lib/sync/transport.mjs';
@@ -12,6 +13,7 @@ export function createAccountSync({
   getLocalState,
   onState,
   onStatus,
+  onSignedIn = () => {},
   bundled = {},
   env = process.env,
 }) {
@@ -109,6 +111,62 @@ export function createAccountSync({
       onStatus: report,
     });
   }
+  let callback = null,
+    callbackTimer = null;
+  async function closeCallback() {
+    const server = callback;
+    callback = null;
+    clearTimeout(callbackTimer);
+    await server?.close();
+  }
+  async function listenForLink() {
+    if (!callback) {
+      try {
+        callback = await startCallbackServer({
+          port: callbackPort(env),
+          onCallback: completeLink,
+        });
+      } catch {
+        throw new Error(
+          '로그인 링크를 받을 준비를 하지 못했습니다. 다른 To3mato를 닫고 다시 시도하세요.',
+        );
+      }
+    }
+    // A link stays valid for an hour on Supabase. Stop listening after that.
+    clearTimeout(callbackTimer);
+    callbackTimer = setTimeout(() => void closeCallback(), 3_600_000);
+    callbackTimer.unref?.();
+  }
+  /** Runs when the browser returns from an email link. */
+  async function completeLink(params) {
+    if (user) return true;
+    const previousOwner = repository?.read().owner;
+    const wasEnabled = repository?.read().enabled;
+    // Stop transport before replacing authentication credentials.
+    await engine?.disable();
+    try {
+      user = await auth.exchange(params);
+    } catch (failure) {
+      if (wasEnabled) await engine?.enable();
+      error = failure.message;
+      report();
+      return false;
+    }
+    if (previousOwner && previousOwner !== user.id) {
+      engine?.destroy();
+      assets?.destroy();
+      repository?.close();
+      engine = repository = assets = null;
+      active = false;
+      onState(getLocalState());
+    } else if (wasEnabled) await engine?.enable();
+    error = '';
+    report();
+    onSignedIn();
+    // Let the browser receive its page before the server goes away.
+    setTimeout(() => void closeCallback(), 1000).unref?.();
+    return true;
+  }
   async function ensureAuth() {
     if (!config)
       throw new Error('이 실행 환경에서는 계정 기능을 사용할 수 없습니다.');
@@ -142,6 +200,8 @@ export function createAccountSync({
       }
       try {
         user = await (await ensureAuth()).restore();
+        // A link requested before the app was closed can still be opened.
+        if (!user && auth.pendingLink()) await listenForLink().catch(() => {});
         if (
           user &&
           fs.existsSync(
@@ -161,27 +221,13 @@ export function createAccountSync({
       }
       report();
     },
-    async requestCode(email) {
-      return (await ensureAuth()).requestCode(email);
-    },
-    async verify(email, code) {
+    /** Emails a sign-in link that returns to this device's callback server. */
+    async requestLink(email) {
       if (user) throw new Error('로그아웃 후 로그인하세요.');
-      const previousOwner = repository?.read().owner;
-      const wasEnabled = repository?.read().enabled;
-      // Stop transport before replacing authentication credentials.
-      await engine?.disable();
-      user = await (await ensureAuth()).verify(email, code);
-      if (previousOwner && previousOwner !== user.id) {
-        engine?.destroy();
-        assets?.destroy();
-        repository?.close();
-        engine = repository = assets = null;
-        active = false;
-        onState(getLocalState());
-      } else if (wasEnabled) await engine?.enable();
+      const current = await ensureAuth();
       error = '';
-      report();
-      return status();
+      await listenForLink();
+      await current.requestLink(email, callback.url);
     },
     async enable() {
       if (!user) throw new Error('로그인하세요.');
@@ -237,6 +283,7 @@ export function createAccountSync({
       repository?.close();
       engine = repository = assets = null;
       active = false;
+      await closeCallback();
       await auth?.logout();
       user = null;
       error = '';
@@ -298,6 +345,7 @@ export function createAccountSync({
       return this.logout();
     },
     destroy() {
+      void closeCallback();
       engine?.destroy();
       assets?.destroy();
       auth?.destroy();

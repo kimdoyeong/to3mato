@@ -110,8 +110,7 @@ declare global {
     to3mato?: {
       account: {
         status(): Promise<AccountStatus>;
-        requestCode(email: string): Promise<void>;
-        verify(email: string, code: string): Promise<AccountStatus>;
+        requestLink(email: string): Promise<void>;
         enable(): Promise<AccountStatus>;
         disable(): Promise<AccountStatus>;
         mediaAdopted(): Promise<void>;

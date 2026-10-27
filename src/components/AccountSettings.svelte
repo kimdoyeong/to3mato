@@ -8,7 +8,11 @@
   let busy = $state(false),
     error = $state('');
   onMount(() =>
-    window.to3mato?.account.subscribe((value) => (account = value)),
+    // Returns nothing: a returned Svelte state proxy cannot cross the
+    // preload bridge and would throw inside the IPC listener.
+    window.to3mato?.account.subscribe((value) => {
+      account = value;
+    }),
   );
   async function run(action: () => Promise<unknown>) {
     busy = true;
@@ -44,7 +48,7 @@
     {:else}
       <p>연동하면 다른 기기와 동기화되어 사용하실 수 있습니다.</p>
       {#if !account.user}
-        <AuthForm onverified={(status) => (account = status)} />
+        <AuthForm />
       {:else}
         <p>{account.user.email}</p>
         <div class="data-actions">

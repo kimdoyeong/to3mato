@@ -1359,11 +1359,8 @@ dialog.onboarding {
   gap: 10px;
   margin-left: auto;
 }
-.auth-step + .auth-step {
-  margin-top: 14px;
-}
 .auth-step p {
-  margin: 0 0 10px;
+  margin: 10px 0 0;
   color: var(--muted);
   font-size: var(--text-sm, 15px);
 }
@@ -1382,14 +1379,9 @@ dialog.onboarding {
   flex: 1;
   min-width: 0;
 }
-.auth-field .btn-line,
-.auth-field .primary {
+.auth-field .btn-line {
   flex: none;
   white-space: nowrap;
-}
-.auth-field .primary {
-  padding: 8px 20px 7px;
-  font-size: var(--text-base, 16px);
 }
 @media (max-width: 560px) {
   dialog.onboarding {
@@ -1398,8 +1390,7 @@ dialog.onboarding {
   .auth-field {
     flex-wrap: wrap;
   }
-  .auth-field .btn-line,
-  .auth-field .primary {
+  .auth-field .btn-line {
     width: 100%;
   }
 }

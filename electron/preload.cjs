@@ -2,8 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('to3mato', {
   account: {
     status: () => ipcRenderer.invoke('account:status'),
-    requestCode: (email) => ipcRenderer.invoke('account:requestCode', email),
-    verify: (email, code) => ipcRenderer.invoke('account:verify', email, code),
+    requestLink: (email) => ipcRenderer.invoke('account:requestLink', email),
     enable: () => ipcRenderer.invoke('account:enable'),
     mediaAdopted: () => ipcRenderer.invoke('account:mediaAdopted'),
     disable: () => ipcRenderer.invoke('account:disable'),
@@ -16,7 +15,14 @@ contextBridge.exposeInMainWorld('to3mato', {
         received = false;
       const listener = (_event, value) => {
         received = true;
-        if (active) callback(value);
+        if (!active) return;
+        // One failing subscriber must not stop the others: listeners run in
+        // order and an exception would end the dispatch.
+        try {
+          callback(value);
+        } catch (error) {
+          console.error(error);
+        }
       };
       ipcRenderer.on('account:status', listener);
       ipcRenderer

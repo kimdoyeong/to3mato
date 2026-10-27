@@ -94,6 +94,12 @@ export function createAuth({
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
+      // Email links come back with a one-time code that only this device can
+      // exchange, because the matching verifier never leaves its storage.
+      flowType: 'pkce',
+      // Each link carries its flow id, so an older email still finds its own
+      // verifier after the user asked for another link.
+      experimental: { appendPkceFlowIdToRedirects: true },
     },
     realtime: { params: { eventsPerSecond: 10 } },
   });
@@ -102,15 +108,18 @@ export function createAuth({
     user = session?.user || null;
     queueMicrotask(() => onChange(user));
   }).data.subscription;
-  const unwrap = (result) => {
+  const unwrap = (result, message) => {
     if (result.error)
       throw new Error(
         result.error.status === 429
           ? '요청이 너무 많습니다. 잠시 후 다시 시도하세요.'
-          : '인증 코드가 올바르지 않거나 만료되었습니다. 다시 요청하세요.',
+          : message,
       );
     return result.data;
   };
+  const LINK_INVALID =
+    '로그인 링크가 올바르지 않거나 만료되었습니다. 다시 요청하세요.';
+  const flowIndexKey = `${client.auth.storageKey}-flows-code-verifier`;
   return {
     client,
     user: () => user,
@@ -120,8 +129,11 @@ export function createAuth({
       user = data.session?.user || null;
       return user;
     },
-    /** A first-time address gets its account when the code is verified. */
-    async requestCode(email) {
+    /**
+     * Emails a sign-in link that returns to redirectTo. A first-time address
+     * gets its account when the link is opened.
+     */
+    async requestLink(email, redirectTo) {
       if (
         typeof email !== 'string' ||
         email.length > 254 ||
@@ -135,23 +147,35 @@ export function createAuth({
       unwrap(
         await client.auth.signInWithOtp({
           email,
-          options: { shouldCreateUser: true },
+          options: { shouldCreateUser: true, emailRedirectTo: redirectTo },
         }),
+        '로그인 링크를 보내지 못했습니다. 잠시 후 다시 시도하세요.',
       );
     },
-    async verify(email, code) {
-      if (
-        typeof email !== 'string' ||
-        typeof code !== 'string' ||
-        !/^\d{6,10}$/.test(code)
-      )
-        throw new Error(
-          '인증 코드가 올바르지 않거나 만료되었습니다. 다시 요청하세요.',
-        );
+    /** Exchanges the code from an opened link. params is the callback query. */
+    async exchange(params) {
+      const code = params.get('code');
+      if (!code || params.get('error') || params.get('error_description'))
+        throw new Error(LINK_INVALID);
+      const flowId = params.get('sb_flow_id') || undefined;
       user = unwrap(
-        await client.auth.verifyOtp({ email, token: code, type: 'email' }),
+        await client.auth.exchangeCodeForSession(code, { flowId }),
+        LINK_INVALID,
       ).user;
       return user;
+    },
+    /** True while a requested link has not been used on this device. */
+    pendingLink() {
+      try {
+        // auth-js stores JSON strings: a flow id list and a legacy slot.
+        const flows = JSON.parse(storage.getItem(flowIndexKey) || '[]');
+        return (
+          !!storage.getItem(`${client.auth.storageKey}-code-verifier`) ||
+          (Array.isArray(flows) && flows.length > 0)
+        );
+      } catch {
+        return false;
+      }
     },
     async logout() {
       await client.auth.signOut({ scope: 'local' });

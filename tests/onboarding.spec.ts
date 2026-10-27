@@ -46,6 +46,7 @@ test('first run walks through, logs in with one email flow and stays finished', 
     TO3MATO_SUPABASE_URL: server.url,
     TO3MATO_SUPABASE_PUBLISHABLE_KEY: 'test',
     TO3MATO_SYNC_TEST: '1',
+    TO3MATO_AUTH_CALLBACK_PORT: '0',
   };
   try {
     // Quitting midway leaves the walkthrough pending for the next launch.
@@ -75,20 +76,38 @@ test('first run walks through, logs in with one email flow and stays finished', 
 
     const account = page.getByRole('dialog', { name: '계정' });
     await expect(account).toBeVisible();
-    // One flow for new and returning users: no tabs, a first-time address works.
+    // One flow for new and returning users: an emailed sign-in link.
     await expect(account.getByRole('tab')).toHaveCount(0);
     await expect(account.getByLabel('인증 코드', { exact: true })).toHaveCount(0);
     await account.getByLabel('이메일', { exact: true }).fill('new@example.test');
-    await account.getByRole('button', { name: '인증 코드 받기' }).click();
+    await account.getByRole('button', { name: '로그인 링크 받기' }).click();
     await expect(
-      account.getByText('인증 코드를 보냈습니다. 10분 안에 입력하세요.'),
+      account.getByText(
+        '로그인 링크를 보냈습니다. 이 컴퓨터에서 메일의 링크를 여세요.',
+      ),
     ).toBeVisible();
-    await expect(account.getByLabel('인증 코드', { exact: true })).toBeFocused();
-    await account.getByLabel('인증 코드', { exact: true }).fill('123456');
-    await account.getByRole('button', { name: '로그인', exact: true }).click();
+
+    // A forged callback cannot sign in, and without the emailed flow id it
+    // cannot use up the real link's verifier either.
+    const forged = new URL(server.linkFor('new@example.test'));
+    forged.search = '';
+    forged.searchParams.set('code', 'forged');
+    const refused = await fetch(forged);
+    expect(await refused.text()).toContain('로그인하지 못했습니다.');
+    await expect(account.getByRole('alert')).toHaveText(
+      '로그인 링크가 올바르지 않거나 만료되었습니다. 다시 요청하세요.',
+    );
+    expect(
+      (await page.evaluate(() => window.to3mato!.account.status())).user,
+    ).toBeNull();
+
+    // Opening the emailed link in a browser on this computer signs the app in.
+    const opened = await fetch(server.linkFor('new@example.test'));
+    expect(await opened.text()).toContain('로그인했습니다.');
     await expect(
       account.getByRole('button', { name: '연동', exact: true }),
     ).toBeVisible();
+    await expect(account.getByRole('alert')).toHaveCount(0);
     // Logging in never starts upload on its own.
     expect(
       (await page.evaluate(() => window.to3mato!.account.status())).enabled,

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { syncPostgres, USER_A, USER_B } from './sync-postgres.mjs';
 
@@ -7,7 +8,12 @@ export async function syncHttpServer() {
   const pg = await syncPostgres();
   const files = new Map(),
     subscribers = new Map(),
-    events = [];
+    events = [],
+    // Sign-in links: the last request per email, and issued one-time codes.
+    links = new Map(),
+    codes = new Map();
+  const userByEmail = (email) =>
+    email === 'b@example.test' ? USER_B : USER_A;
   let sequence = Promise.resolve(),
     disconnected = false;
   const serialize = (fn) => {
@@ -83,7 +89,34 @@ export async function syncHttpServer() {
         // The app always lets a first-time address create its account.
         if (body.create_user !== true)
           return reply({ error_code: 'validation_failed', msg: 'create_user expected' }, 400);
+        // A link request carries the PKCE challenge and where to return.
+        if (body.code_challenge)
+          links.set(body.email, {
+            challenge: body.code_challenge,
+            method: body.code_challenge_method,
+            redirect: url.searchParams.get('redirect_to'),
+          });
         return reply({});
+      }
+      if (
+        url.pathname === '/auth/v1/token' &&
+        url.searchParams.get('grant_type') === 'pkce'
+      ) {
+        const issued = codes.get(body.auth_code);
+        codes.delete(body.auth_code);
+        const expected =
+          issued?.method?.toLowerCase() === 's256'
+            ? crypto
+                .createHash('sha256')
+                .update(body.code_verifier || '')
+                .digest('base64url')
+            : body.code_verifier;
+        if (!issued || expected !== issued.challenge)
+          return reply(
+            { error_code: 'bad_code_verifier', msg: 'code challenge does not match' },
+            400,
+          );
+        return reply(session(userByEmail(issued.email)));
       }
       if (url.pathname === '/auth/v1/verify')
         return reply(
@@ -206,6 +239,16 @@ export async function syncHttpServer() {
     url: `http://127.0.0.1:${server.address().port}`,
     pg,
     events,
+    /** The callback URL a click on the last emailed link would open. */
+    linkFor(email) {
+      const link = links.get(email);
+      if (!link?.redirect) throw new Error(`no sign-in link for ${email}`);
+      const code = crypto.randomUUID();
+      codes.set(code, { ...link, email });
+      const target = new URL(link.redirect);
+      target.searchParams.set('code', code);
+      return target.toString();
+    },
     offline(value) {
       disconnected = value;
       if (value) for (const socket of subscribers.keys()) socket.close();
