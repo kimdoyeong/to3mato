@@ -1305,7 +1305,8 @@ dialog.onboarding {
   background: var(--red);
 }
 /* 단계가 바뀌어도 아래 버튼 위치가 움직이지 않도록 본문 높이를 맞춘다 */
-.onboarding-content.intro {
+/* .intro는 할 일 화면 머리글의 가로 배치 규칙이라 다른 이름을 쓴다 */
+.onboarding-content.onboarding-intro {
   min-height: 236px;
 }
 .onboarding-art {

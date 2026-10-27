@@ -12,6 +12,18 @@ import { syncHttpServer } from './helpers/sync-http.mjs';
 
 const WELCOME = '일단 3번만 해봅시다. 토오오오마토.';
 
+/** Art, title and description stack top to bottom; a stray flex rule once laid them out in a row. */
+async function expectStacked(page: import('@playwright/test').Page) {
+  const boxes = await page.evaluate(() =>
+    ['.onboarding-art', '#onboarding-title', '.onboarding-body'].map((selector) => {
+      const box = document.querySelector(selector)!.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom };
+    }),
+  );
+  expect(boxes[0].bottom).toBeLessThanOrEqual(boxes[1].top);
+  expect(boxes[1].bottom).toBeLessThanOrEqual(boxes[2].top);
+}
+
 function launch(directory: string, extra: Record<string, string> = {}) {
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
@@ -47,12 +59,14 @@ test('first run walks through, separates login from signup and stays finished', 
     const page = await app.firstWindow();
     const dialog = page.getByRole('dialog', { name: WELCOME });
     await expect(dialog).toBeVisible();
+    await expectStacked(page);
     await expect(
       dialog.getByRole('button', { name: '이전', exact: true }),
     ).toHaveCount(0);
     for (const title of ['할 일을 정리', '하나를 실행', '기록을 확인']) {
       await page.getByRole('button', { name: '다음', exact: true }).click();
       await expect(page.getByRole('dialog', { name: title })).toBeVisible();
+      await expectStacked(page);
     }
     await page.getByRole('button', { name: '이전', exact: true }).click();
     await expect(page.getByRole('dialog', { name: '하나를 실행' })).toBeVisible();

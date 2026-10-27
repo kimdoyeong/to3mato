@@ -103,7 +103,7 @@
       {#each Array(last + 1) as _, i (i)}<span class:on={i === step}
         ></span>{/each}
     </div>
-    <div class="onboarding-content" class:intro={step < last}>
+    <div class="onboarding-content" class:onboarding-intro={step < last}>
     {#if step < last}
       <div class="onboarding-art" aria-hidden="true">
         {#if step === 0}<Mascot />
