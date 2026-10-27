@@ -1359,9 +1359,6 @@ dialog.onboarding {
   gap: 10px;
   margin-left: auto;
 }
-.auth-form .add-mode {
-  margin-bottom: 14px;
-}
 .auth-step + .auth-step {
   margin-top: 14px;
 }

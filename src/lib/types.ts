@@ -99,7 +99,6 @@ export type AccountStatus = {
     document?: unknown;
   }>;
 };
-export type AuthMode = 'login' | 'signup';
 export type Command = { type: string; payload?: Record<string, unknown> };
 export type UpdateStatus =
   | { status: 'idle' | 'checking' }
@@ -111,7 +110,7 @@ declare global {
     to3mato?: {
       account: {
         status(): Promise<AccountStatus>;
-        requestCode(email: string, mode: AuthMode): Promise<void>;
+        requestCode(email: string): Promise<void>;
         verify(email: string, code: string): Promise<AccountStatus>;
         enable(): Promise<AccountStatus>;
         disable(): Promise<AccountStatus>;

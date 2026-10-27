@@ -35,7 +35,7 @@ function launch(directory: string, extra: Record<string, string> = {}) {
   return electron.launch({ args: ['.'], env });
 }
 
-test('first run walks through, separates login from signup and stays finished', async () => {
+test('first run walks through, logs in with one email flow and stays finished', async () => {
   test.setTimeout(90000);
   const server = await syncHttpServer();
   const directory = await fs.mkdtemp(
@@ -75,32 +75,21 @@ test('first run walks through, separates login from signup and stays finished', 
 
     const account = page.getByRole('dialog', { name: '계정' });
     await expect(account).toBeVisible();
-    await expect(
-      account.getByRole('tab', { name: '로그인', exact: true }),
-    ).toHaveAttribute('aria-selected', 'true');
-    await account.getByLabel('이메일', { exact: true }).fill('new@example.test');
-    await account.getByRole('button', { name: '인증 코드 받기' }).click();
-    await expect(account.getByRole('alert')).toHaveText(
-      '가입된 계정이 없습니다. 회원가입을 진행하세요.',
-    );
+    // One flow for new and returning users: no tabs, a first-time address works.
+    await expect(account.getByRole('tab')).toHaveCount(0);
     await expect(account.getByLabel('인증 코드', { exact: true })).toHaveCount(0);
-
-    await account.getByRole('tab', { name: '회원가입', exact: true }).click();
-    await expect(account.getByRole('alert')).toHaveCount(0);
-    await expect(account.getByLabel('이메일', { exact: true })).toHaveValue(
-      'new@example.test',
-    );
+    await account.getByLabel('이메일', { exact: true }).fill('new@example.test');
     await account.getByRole('button', { name: '인증 코드 받기' }).click();
     await expect(
       account.getByText('인증 코드를 보냈습니다. 10분 안에 입력하세요.'),
     ).toBeVisible();
     await expect(account.getByLabel('인증 코드', { exact: true })).toBeFocused();
     await account.getByLabel('인증 코드', { exact: true }).fill('123456');
-    await account.getByRole('button', { name: '회원가입', exact: true }).click();
+    await account.getByRole('button', { name: '로그인', exact: true }).click();
     await expect(
       account.getByRole('button', { name: '연동', exact: true }),
     ).toBeVisible();
-    // Signing up never starts upload on its own.
+    // Logging in never starts upload on its own.
     expect(
       (await page.evaluate(() => window.to3mato!.account.status())).enabled,
     ).toBe(false);

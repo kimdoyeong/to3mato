@@ -11,7 +11,7 @@
 - 패키징 전에 같은 환경 변수로 `npm run sync:configure`를 실행한다. 생성되는 `electron/supabase-config.json`은 앱에 포함되며 Git에서는 제외한다.
 - 구성 값이 없으면 로컬 기능은 유지되고 계정 기능만 사용할 수 없다. 잘못된 구성도 로컬 데이터를 변경하지 않는다.
 - HTTP 주소는 `127.0.0.1` 시험 서버만 허용한다. 시험 키 예외에는 `TO3MATO_SYNC_TEST=1`이 필요하다. 운영 설정 생성 도구는 HTTPS와 publishable key를 요구한다.
-- 로그인은 계정을 만들지 않는다(`shouldCreateUser: false`). 가입되지 않은 이메일은 Supabase가 `otp_disabled`(422)로 거부하고 앱은 회원가입 안내 오류를 표시한다. 회원가입은 첫 인증 때 계정을 만든다.
+- 로그인과 회원가입을 구분하지 않는다. 이메일 인증 코드 요청은 `shouldCreateUser: true`이며, 처음 쓰는 이메일은 인증 때 계정이 만들어진다. 로그인만으로 업로드하지 않으므로 이메일 오타로 생긴 빈 계정은 연동 전에 화면의 이메일로 확인할 수 있다.
 - 첫 실행 안내는 기기별로 `userData/onboarding.json`에 기록하며 동기화하지 않는다. 앱을 열 때 기존 DB가 있으면 업데이트로 보고 건너뛴다. `TO3MATO_ONBOARDING`은 `auto`·`on`·`off`를 받으며, `TO3MATO_USER_DATA`를 지정한 시험·개발 실행의 기본값은 `off`다.
 - 브라우저 시험 클라이언트는 `tests/sync-harness.html`이다. 배포용 Vite 입력에 포함하지 않는다. 테스트 세션은 메모리, 데이터와 전송 대기열은 IndexedDB에 둔다.
 

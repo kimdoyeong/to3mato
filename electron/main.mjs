@@ -556,7 +556,7 @@ if (!app.requestSingleInstanceLock()) {
         });
         const accountMethods = {
           status: () => account.status(),
-          requestCode: (email, mode) => account.requestCode(email, mode),
+          requestCode: (email) => account.requestCode(email),
           verify: (email, code) => account.verify(email, code),
           enable: () => {
             store.snapshot(

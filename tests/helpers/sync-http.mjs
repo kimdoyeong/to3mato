@@ -7,10 +7,7 @@ export async function syncHttpServer() {
   const pg = await syncPostgres();
   const files = new Map(),
     subscribers = new Map(),
-    events = [],
-    // Addresses that already have an account. A login code for any other
-    // address is refused like Supabase does when create_user is false.
-    accounts = new Set(['a@example.test', 'b@example.test']);
+    events = [];
   let sequence = Promise.resolve(),
     disconnected = false;
   const serialize = (fn) => {
@@ -83,12 +80,9 @@ export async function syncHttpServer() {
     };
     try {
       if (url.pathname === '/auth/v1/otp') {
-        if (body.create_user === false && !accounts.has(body.email))
-          return reply(
-            { error_code: 'otp_disabled', msg: 'Signups not allowed for otp' },
-            422,
-          );
-        accounts.add(body.email);
+        // The app always lets a first-time address create its account.
+        if (body.create_user !== true)
+          return reply({ error_code: 'validation_failed', msg: 'create_user expected' }, 400);
         return reply({});
       }
       if (url.pathname === '/auth/v1/verify')

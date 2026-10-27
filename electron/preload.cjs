@@ -2,8 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('to3mato', {
   account: {
     status: () => ipcRenderer.invoke('account:status'),
-    requestCode: (email, mode) =>
-      ipcRenderer.invoke('account:requestCode', email, mode),
+    requestCode: (email) => ipcRenderer.invoke('account:requestCode', email),
     verify: (email, code) => ipcRenderer.invoke('account:verify', email, code),
     enable: () => ipcRenderer.invoke('account:enable'),
     mediaAdopted: () => ipcRenderer.invoke('account:mediaAdopted'),
