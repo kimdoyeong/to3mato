@@ -1,27 +1,29 @@
 import Foundation
 import Observation
 import SwiftUI
+import To3matoCloud
+import To3matoCore
 
-/// UI 단계의 메모리 상태. 저장, 도메인 규칙, 동기화는 다음 단계에서 Mac의 domain.mjs와 같은 규칙으로 옮긴다.
-/// 여기의 동작은 화면 확인에 필요한 만큼만 흉내 낸다.
+/// 화면 상태와 명령 창구. 규칙은 To3matoCore의 Domain과 SyncEngine이 처리한다.
+/// 연동하지 않으면 기기 파일에, 연동하면 계정 저장소와 Supabase에 기록한다.
+@MainActor
 @Observable
 final class AppModel {
-  static let maxTaskEstimate = 2
+  static let maxTaskEstimate = Domain.maxTaskEstimate
   static let maxBatchSize = 500
 
-  var settings = Settings()
-  var projects: [Project] = []
-  var tasks: [TaskItem] = []
-  var records: [FocusRecord] = []
-  var tickets: [Ticket] = []
-  var templates: [TaskTemplate] = []
-  var clips: [Clip] = []
-  var deliveries: [Delivery] = []
-  var timer: TimerState? {
-    didSet { if timer != oldValue { liveActivity.sync(self) } }
+  var state = AppState() {
+    didSet {
+      if state.timer != oldValue.timer {
+        liveActivity.sync(self)
+        notifications.sync(self)
+      }
+    }
   }
   var now = Date.now
-  @ObservationIgnored private let liveActivity = LiveActivityController()
+  var account = AccountState()
+  var clips: [Clip] = []
+  var deliveries: [Delivery] = []
 
   // 화면 상태
   var tab: AppTab = .todo
@@ -30,45 +32,41 @@ final class AppModel {
   var planOpen = false
   var toast: String?
 
+  @ObservationIgnored private let liveActivity = LiveActivityController()
+  @ObservationIgnored private let notifications = NotificationScheduler()
+  @ObservationIgnored private let localStore = LocalStore(url: AppPaths.localState)
+  @ObservationIgnored private var cloud: CloudAccount?
+  @ObservationIgnored private var engine: SyncEngine?
+  @ObservationIgnored private var repository: FileEnvelopeRepository?
+  @ObservationIgnored private var syncClock = SyncClock()
+  /// 계정 저장소를 보여주는 중인지. 연동을 꺼도 로그인 상태면 계정 데이터를 보여준다(Mac과 같음).
+  @ObservationIgnored private var active = false
+  @ObservationIgnored private var advancing = false
+
   // MARK: 파생 값
 
-  var today: String { Day.key(now) }
+  var tasks: [TaskItem] { state.tasks }
+  var projects: [Project] { state.projects }
+  var records: [FocusRecord] { state.records }
+  var tickets: [Ticket] { state.tickets }
+  var templates: [TaskTemplate] { state.templates }
+  var timer: TimerState? { state.timer }
+  var settings: Settings { state.settings }
 
-  func sections() -> [TodoSection] {
-    let today = today
-    let tomorrow = Day.offset(1, from: today)
-    let dated = Set(tasks.map(\.date).filter { !$0.isEmpty })
-    let upcoming = dated.filter { $0 > tomorrow }.sorted()
-    let past = dated.filter { $0 < today }
-      .filter { date in tasks.contains { $0.date == date && !$0.done } }
-      .sorted(by: >)
-    return ([today, tomorrow] + upcoming + past + [""]).map { date in
-      let label: String
-      if date.isEmpty {
-        label = "미지정"
-      } else if date == today {
-        label = "오늘"
-      } else if date == tomorrow {
-        label = "내일"
-      } else {
-        let year = date.prefix(4) != today.prefix(4) ? "\(Int(date.prefix(4)) ?? 0)년 " : ""
-        let month = Int(date.dropFirst(5).prefix(2)) ?? 0
-        let day = Int(date.suffix(2)) ?? 0
-        label = "\(year)\(month)월 \(day)일"
-      }
-      return TodoSection(date: date, label: label, tasks: tasks.filter { $0.date == date })
-    }
-  }
+  /// 명령에 쓰는 현재 시각(ms). 연동 중에는 서버 시간으로 보정한다.
+  var nowMs: Double { active ? syncClock.now() : epochMilliseconds(now) }
+
+  var today: String { Domain.localDate(Date(timeIntervalSince1970: nowMs / 1000)) }
+
+  func sections() -> [TodoSection] { Domain.todoSections(tasks, today: today) }
 
   var todayTasks: [TaskItem] { tasks.filter { $0.date == today } }
   var pendingToday: [TaskItem] { todayTasks.filter { !$0.done } }
 
-  func used(_ taskId: String) -> Double {
-    records.filter { $0.taskId == taskId }.reduce(0) { $0 + $1.pomodoros }
-  }
+  func used(_ taskId: String) -> Double { Domain.usedPomodoros(state, taskId) }
 
   func doneOn(_ date: String) -> Double {
-    records.filter { Day.key($0.at) == date }.reduce(0) { $0 + $1.pomodoros }
+    records.filter { Domain.localDate($0.date) == date }.reduce(0) { $0 + $1.pomodoros }
   }
 
   func allocated(on date: String) -> Int {
@@ -79,7 +77,7 @@ final class AppModel {
 
   var timerTask: TaskItem? { tasks.first { $0.id == timer?.taskId } }
 
-  var elapsed: Double { timer?.elapsedSeconds(at: now) ?? 0 }
+  var elapsed: Double { timer.map { Domain.elapsedSeconds($0, nowMs) } ?? 0 }
 
   var remainingSeconds: Int {
     Int(max(0, ((timer?.duration ?? settings.focus) - elapsed).rounded(.up)))
@@ -89,15 +87,7 @@ final class AppModel {
     String(format: "%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
   }
 
-  /// Mac의 timerMenuState() 상태 문구
-  var timerStatus: String {
-    guard let timer else { return "집중 대기" }
-    switch timer.phase {
-    case .checkin: return "진척 확인"
-    case .rest: return timer.running ? "휴식 중" : "휴식 대기"
-    case .focus: return timer.running ? "집중 중" : "일시정지"
-    }
-  }
+  var timerStatus: String { Domain.timerStatus(timer) }
 
   func isCurrent(_ task: TaskItem) -> Bool {
     timer?.phase != .rest && timer?.taskId == task.id
@@ -118,7 +108,7 @@ final class AppModel {
   func ticketWeeks(_ projectId: String) -> [TicketWeek] {
     var weeks: [TicketWeek] = []
     for ticket in tickets.filter({ $0.projectId == projectId }).sorted(by: { $0.completedAt > $1.completedAt }) {
-      let start = Day.weekStart(ticket.completedAt)
+      let start = Day.weekStart(ticket.completedDate)
       let id = Day.key(start)
       if let index = weeks.firstIndex(where: { $0.id == id }) {
         weeks[index].tickets.append(ticket)
@@ -132,299 +122,477 @@ final class AppModel {
 
   func sevenDayAverage() -> String {
     let total = (1...7).reduce(0.0) { $0 + doneOn(Day.offset(-$1, from: today)) }
-    let value = total / 7
+    let value = (total / 7 * 10).rounded() / 10
     return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
   }
 
-  // MARK: 할 일
+  // MARK: 시작
+
+  func start() {
+    do {
+      state = try localStore.load()
+      if !localStore.exists { try localStore.save(state) }
+    } catch {
+      notify(error.localizedDescription)
+    }
+    applyLaunchArguments()
+    Task { await restoreAccount() }
+  }
+
+  // MARK: 명령
 
   func notify(_ message: String) {
     toast = message
     let shown = message
-    Task { @MainActor in
+    Task {
       try? await Task.sleep(for: .seconds(2.4))
-      if self.toast == shown { self.toast = nil }
+      if toast == shown { toast = nil }
+    }
+  }
+
+  /// 명령을 적용한다. 성공하면 success 문구를 알린다.
+  func send(_ command: Command, success: String? = nil, then: (() -> Void)? = nil) {
+    if active, let engine {
+      Task {
+        do {
+          state = try await engine.dispatch(command)
+          if let success { notify(success) }
+          then?()
+        } catch {
+          notify(error.localizedDescription)
+        }
+      }
+      return
+    }
+    do {
+      state = try Domain.applyCommand(state, command, now: nowMs)
+      try localStore.save(state)
+      if let success { notify(success) }
+      then?()
+    } catch {
+      notify(error.localizedDescription)
     }
   }
 
   func toggle(_ task: TaskItem) {
-    guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
-    tasks[index].done.toggle()
-    if tasks[index].done {
-      issueTicket(for: tasks[index])
-      notify("할 일을 완료했습니다.")
-    } else {
-      if let ticket = tickets.lastIndex(where: { $0.taskId == task.id && !$0.voided }) {
-        tickets[ticket].voided = true
-      }
-      notify("완료를 취소했습니다.")
-    }
+    send(Command("task:toggle", ["id": .string(task.id)]), success: task.done ? "완료를 취소했습니다." : "할 일을 완료했습니다.")
   }
 
   func setEstimate(_ task: TaskItem, _ estimate: Int) {
-    guard let index = tasks.firstIndex(where: { $0.id == task.id }) else { return }
-    tasks[index].estimate = estimate
-    tasks[index].remaining = estimate
+    guard estimate != task.estimate else { return }
+    send(
+      Command(
+        "task:save",
+        ["id": .string(task.id), "title": .string(task.title), "estimate": .number(Double(estimate)),
+         "date": .string(task.date), "project": .string(task.project)]))
   }
 
   func move(_ taskId: String, to date: String) {
-    guard let index = tasks.firstIndex(where: { $0.id == taskId }), tasks[index].date != date else { return }
-    tasks[index].date = date
-    notify("예정일을 변경했습니다.")
+    guard let task = tasks.first(where: { $0.id == taskId }), task.date != date else { return }
+    send(Command("task:move", ["id": .string(taskId), "date": .string(date)]), success: "예정일을 변경했습니다.")
   }
 
   func delete(_ taskId: String) {
-    tasks.removeAll { $0.id == taskId }
-    if timer?.taskId == taskId { timer = nil }
-    notify("할 일을 삭제했습니다. 집중 기록은 유지됩니다.")
+    send(Command("task:delete", ["id": .string(taskId)]), success: "할 일을 삭제했습니다. 집중 기록은 유지됩니다.")
   }
 
-  /// 오늘 목록의 순서를 바꾼다. 다른 날짜의 할 일 위치는 그대로 둔다.
+  /// 한 날짜 목록 안에서 순서를 바꾼다. 앞에 놓을 할 일을 기준으로 옮긴다.
   func reorder(on date: String, from source: IndexSet, to destination: Int) {
-    var ordered = tasks.filter { $0.date == date }
-    ordered.move(fromOffsets: source, toOffset: destination)
-    var iterator = ordered.makeIterator()
-    tasks = tasks.map { $0.date == date ? (iterator.next() ?? $0) : $0 }
-  }
-
-  @discardableResult
-  func addTask(title: String, estimate: Int = 1, date: String, project: String = "") -> String {
-    let id = UUID().uuidString
-    tasks.append(
-      TaskItem(
-        id: id, title: title.trimmingCharacters(in: .whitespaces), estimate: estimate,
-        remaining: estimate, project: project, date: date))
-    return id
-  }
-
-  func save(_ task: TaskItem) {
-    if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-      tasks[index] = task
-      notify("할 일을 수정했습니다.")
-    } else {
-      tasks.append(task)
-      notify("할 일을 추가했습니다.")
+    let ordered = tasks.filter { $0.date == date }
+    guard let from = source.first, ordered.indices.contains(from) else { return }
+    let moved = ordered[from]
+    var before = ""
+    if destination < ordered.count {
+      before = ordered[destination].id
+    } else if let last = ordered.last, let index = tasks.firstIndex(where: { $0.id == last.id }) {
+      before = tasks[(index + 1)...].first { $0.id != moved.id }?.id ?? ""
     }
+    guard before != moved.id else { return }
+    send(Command("task:reorder", ["id": .string(moved.id), "before": .string(before)]))
   }
 
-  func addBatch(_ items: [TaskItem]) {
-    tasks.append(contentsOf: items)
+  func addTask(title: String, estimate: Int = 1, date: String, project: String = "") {
+    send(
+      Command(
+        "task:save",
+        ["title": .string(title), "estimate": .number(Double(estimate)), "date": .string(date), "project": .string(project)]),
+      success: "할 일을 추가했습니다.")
+  }
+
+  /// 새 할 일이면 추가, 있으면 수정. remaining은 사용자가 바꿨을 때만 보낸다.
+  func save(_ task: TaskItem, remaining: Int? = nil) {
+    let existing = tasks.contains { $0.id == task.id }
+    var payload: [String: JSON] = [
+      "title": .string(task.title), "estimate": .number(Double(task.estimate)), "date": .string(task.date),
+      "project": .string(task.project),
+    ]
+    if existing { payload["id"] = .string(task.id) }
+    if let remaining { payload["remaining"] = .number(Double(remaining)) }
+    send(Command("task:save", payload), success: existing ? "할 일을 수정했습니다." : "할 일을 추가했습니다.")
+  }
+
+  func addBatch(_ items: [TaskItem], project: String) {
+    send(
+      Command(
+        "task:batch",
+        ["project": .string(project),
+         "tasks": .array(items.map { ["title": .string($0.title), "estimate": .number(Double($0.estimate)), "date": .string($0.date)] })]),
+      success: "할 일을 추가했습니다.")
   }
 
   func apply(_ template: TaskTemplate, date: String, project: String) {
-    for step in template.steps {
-      addTask(title: step.title.replacingOccurrences(of: "%n%", with: "1"), estimate: step.estimate, date: date, project: project)
-    }
+    send(Command("template:apply", ["id": .string(template.id), "date": .string(date), "project": .string(project)]))
+  }
+
+  func saveTemplate(id: String?, name: String, steps: [TemplateStep], then: (() -> Void)? = nil) {
+    var payload: [String: JSON] = [
+      "name": .string(name),
+      "steps": .array(steps.map { ["title": .string($0.title), "estimate": .number(Double($0.estimate))] }),
+    ]
+    if let id, !id.isEmpty { payload["id"] = .string(id) }
+    send(Command("template:save", payload), then: then)
   }
 
   func setCapacity(_ value: Int) {
-    settings.dailyCapacity = min(16, max(1, value))
+    guard (1...16).contains(value) else { return }
+    send(Command("settings:save", ["dailyCapacity": .number(Double(value))]))
   }
 
-  private func issueTicket(for task: TaskItem) {
-    tickets.append(
-      Ticket(
-        id: UUID().uuidString, taskId: task.id, title: task.title, projectId: task.project,
-        completedAt: now, estimate: task.estimate, used: used(task.id)))
+  func saveSettings(_ payload: [String: JSON]) {
+    send(Command("settings:save", payload))
+  }
+
+  /// "HH:mm" 설정을 시각으로 다룬다. nil이면 알림을 쓰지 않는다.
+  func timeSetting(_ key: String) -> Date? {
+    let value = key == "planAt" ? settings.planAt : settings.reviewAt
+    let parts = value.split(separator: ":").compactMap { Int($0) }
+    guard parts.count == 2 else { return nil }
+    return Calendar.current.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: .now)
+  }
+
+  func setTimeSetting(_ key: String, _ date: Date?) {
+    let value = date.map {
+      let parts = Calendar.current.dateComponents([.hour, .minute], from: $0)
+      return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+    } ?? ""
+    saveSettings([key: .string(value)])
+  }
+
+  var remindDays: Set<Int> {
+    get { Set(settings.remindDays) }
+    set { saveSettings(["remindDays": .array(newValue.sorted().map { .number(Double($0)) })]) }
+  }
+
+  func updateTicket(_ id: String, _ fields: [String: JSON]) {
+    send(Command("ticket:update", fields.merging(["id": .string(id)]) { $1 }))
   }
 
   // MARK: 타이머
 
   func tick(_ date: Date) {
     now = date
-    guard var current = timer, current.running, current.elapsedSeconds(at: date) >= current.duration else { return }
-    switch current.phase {
-    case .focus:
-      record(current, seconds: current.duration, pomodoros: 1)
-      current.elapsed = current.duration
-      current.running = false
-      current.phase = .checkin
-      timer = current
-      runSheetOpen = true
-    case .rest:
-      timer = nil
-    case .checkin:
-      break
+    guard let timer, timer.running, Domain.elapsedSeconds(timer, nowMs) >= timer.duration else { return }
+    if active, let engine {
+      guard !advancing else { return }
+      advancing = true
+      Task {
+        defer { advancing = false }
+        if let next = try? await engine.dispatch(Command("timer:advance")) {
+          state = next
+          if next.timer?.phase == .checkin { runSheetOpen = true }
+        }
+      }
+      return
     }
+    var next = state
+    guard Domain.advanceTimer(&next, nowMs) else { return }
+    state = next
+    try? localStore.save(state)
+    if next.timer?.phase == .checkin { runSheetOpen = true }
   }
 
   func play(_ taskId: String) {
-    if let current = timer, current.phase == .focus, current.taskId == taskId {
+    if let timer, timer.phase == .focus, timer.taskId == taskId, timer.running {
       toggleTimer()
       return
     }
-    if let current = timer, current.phase == .focus, current.taskId != nil {
-      let seconds = current.elapsedSeconds(at: now)
-      let pomodoros = rounded(seconds / current.duration)
-      record(current, seconds: seconds, pomodoros: pomodoros)
-      if pomodoros > 0 { notify("\(pomodoros.pomodoroText)포모도로 기록 · 새 타이머 시작") }
+    let before = records.count
+    send(Command("timer:play", ["id": .string(taskId)])) { [weak self] in
+      guard let self, self.records.count > before, let last = self.records.last else { return }
+      self.notify("\(last.pomodoros.pomodoroText)포모도로 기록 · 새 타이머 시작")
     }
-    timer = TimerState(
-      taskId: taskId, duration: settings.focus, elapsed: 0, startedAt: now, running: true, phase: .focus)
+    notifications.requestPermission()
   }
 
   func toggleTimer() {
-    guard var current = timer else {
+    guard let timer else {
       if let first = pendingToday.first { play(first.id) }
       return
     }
-    if current.running {
-      current.elapsed = current.elapsedSeconds(at: now)
-      current.running = false
-    } else {
-      current.startedAt = now
-      current.running = true
-    }
-    timer = current
+    send(Command(timer.phase == .checkin ? "checkin:skip" : "timer:toggle"))
   }
 
   func endTimer() {
-    guard let current = timer else { return }
-    if current.phase == .focus {
-      let seconds = current.elapsedSeconds(at: now)
-      record(current, seconds: seconds, pomodoros: rounded(seconds / current.duration))
-      notify("집중 기록 저장 완료")
-    } else {
-      notify("휴식 종료")
-    }
-    timer = nil
+    let rest = timer?.phase == .rest
+    send(Command("timer:end"), success: rest ? "휴식 종료" : "집중 기록 저장 완료")
   }
 
   func checkinSave(remaining: Int) {
-    guard let id = timer?.taskId, let index = tasks.firstIndex(where: { $0.id == id }) else { return }
-    tasks[index].remaining = remaining
-    startRest()
+    send(Command("checkin:save", ["remaining": .number(Double(remaining))]))
   }
 
-  func checkinDone() {
-    guard let id = timer?.taskId, let index = tasks.firstIndex(where: { $0.id == id }) else { return }
-    tasks[index].done = true
-    issueTicket(for: tasks[index])
-    notify("할 일을 완료했습니다.")
-    startRest()
-  }
+  func checkinDone() { send(Command("checkin:done"), success: "할 일을 완료했습니다.") }
 
-  func checkinFollowUp() {
-    guard let id = timer?.taskId, let index = tasks.firstIndex(where: { $0.id == id }) else { return }
-    tasks[index].done = true
-    issueTicket(for: tasks[index])
-    var next = tasks[index]
-    next.id = UUID().uuidString
-    next.done = false
-    next.followUpOf = id
-    next.estimate = 1
-    next.remaining = 1
-    next.date = today
-    tasks.append(next)
-    notify("할 일을 추가했습니다.")
-    startRest()
-  }
-
-  private func startRest() {
-    timer = TimerState(
-      taskId: timer?.taskId, duration: settings.rest, elapsed: 0, startedAt: now, running: true, phase: .rest)
-  }
-
-  private func record(_ timer: TimerState, seconds: Double, pomodoros: Double) {
-    guard let taskId = timer.taskId else { return }
-    records.append(
-      FocusRecord(
-        id: UUID().uuidString, taskId: taskId, seconds: seconds, pomodoros: pomodoros,
-        duration: timer.duration, at: now))
-  }
-
-  /// 작업 전환 시 0 / 0.5 / 1포모도로로 반올림한다.
-  private func rounded(_ ratio: Double) -> Double {
-    ratio >= 0.75 ? 1 : ratio >= 0.25 ? 0.5 : 0
-  }
+  func checkinFollowUp() { send(Command("checkin:followup"), success: "할 일을 추가했습니다.") }
 
   // MARK: 프로젝트
 
   func saveProject(id: String?, name: String, outcome: String) {
-    if let id, let index = projects.firstIndex(where: { $0.id == id }) {
-      projects[index].name = name
-      projects[index].outcome = outcome
-      notify("프로젝트를 수정했습니다.")
-    } else {
-      let colors = ["#d08c6f", "#84956c", "#b49b65"]
-      let icons = ["folder", "book", "leaf"]
-      projects.append(
-        Project(
-          id: UUID().uuidString, name: name, icon: icons[projects.count % 3],
-          color: colors[projects.count % 3], outcome: outcome))
-      notify("프로젝트를 추가했습니다.")
-    }
+    var payload: [String: JSON] = ["name": .string(name), "outcome": .string(outcome)]
+    if let id { payload["id"] = .string(id) }
+    send(Command("project:save", payload), success: id == nil ? "프로젝트를 추가했습니다." : "프로젝트를 수정했습니다.")
   }
 
   func deleteProject(_ id: String) {
-    projects.removeAll { $0.id == id }
-    for index in tasks.indices where tasks[index].project == id {
-      tasks[index].project = ""
-    }
+    send(Command("project:delete", ["id": .string(id)]))
   }
 
   func setImage(_ data: Data?, for projectId: String) {
-    guard let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
-    projects[index].image = data
+    guard let project = project(projectId) else { return }
+    do {
+      let name = try data.map(ProjectImages.store) ?? ""
+      send(Command("project:save", ["id": .string(project.id), "name": .string(project.name), "image": .string(name)]))
+    } catch {
+      notify(error.localizedDescription)
+    }
   }
 
-  func decorate(_ ticketId: String, _ change: (inout Ticket) -> Void) {
-    guard let index = tickets.firstIndex(where: { $0.id == ticketId }) else { return }
-    change(&tickets[index])
-  }
-}
+  // MARK: 가져오기·내보내기
 
-enum AppTab: Hashable {
-  case todo, projects, calendar, log
-}
-
-extension AppModel {
-  /// Mac의 createInitialState()와 같은 첫 데이터에 화면 확인용 기록을 더한다.
-  static func sample(now: Date = .now) -> AppModel {
-    let model = AppModel()
-    let today = Day.key(now)
-    model.projects = [
-      Project(id: "p1", name: "사이드 프로젝트", icon: "folder", color: "#d08c6f"),
-      Project(id: "p2", name: "디자인 학습", icon: "book", color: "#84956c"),
-      Project(id: "p3", name: "독서", icon: "leaf", color: "#b49b65"),
-    ]
-    model.tasks = [
-      TaskItem(id: "t1", title: "프로젝트 아이디어 정리", estimate: 2, remaining: 1, project: "p1", date: today),
-      TaskItem(id: "t2", title: "디자인 강의 수강", estimate: 2, remaining: 2, project: "p2", date: today),
-      TaskItem(id: "t3", title: "도서 읽기", estimate: 1, remaining: 0, project: "p3", date: today, done: true),
-      TaskItem(id: "t4", title: "첫 화면 참고 자료 조사", estimate: 2, remaining: 2, project: "p1", date: Day.offset(1, from: today)),
-      TaskItem(id: "t5", title: "주간 할 일 정리", estimate: 1, remaining: 1, project: "", date: ""),
-    ]
-    let hour: Double = 3600
-    model.records = [
-      FocusRecord(id: "r1", taskId: "t3", seconds: 1500, pomodoros: 1, duration: 1500, at: now.addingTimeInterval(-3 * hour)),
-      FocusRecord(id: "r2", taskId: "t1", seconds: 1500, pomodoros: 1, duration: 1500, at: now.addingTimeInterval(-2 * hour)),
-    ]
-    model.tickets = [
-      Ticket(
-        id: "k1", taskId: "t3", title: "도서 읽기", projectId: "p3",
-        completedAt: now.addingTimeInterval(-2.5 * hour), estimate: 1, used: 1, highlight: true, sticker: .star),
-      Ticket(
-        id: "k2", taskId: "t3-prev", title: "도서 읽기", projectId: "p3",
-        completedAt: now.addingTimeInterval(-8 * 24 * hour), estimate: 1, used: 1.5),
-    ]
-    model.clips = [
-      Clip(id: "c1", taskTitle: "도서 읽기", at: now.addingTimeInterval(-2.5 * hour)),
-      Clip(id: "c2", taskTitle: "프로젝트 아이디어 정리", at: now.addingTimeInterval(-1.5 * hour)),
-    ]
-    let lastWeek = Day.calendar.date(byAdding: .day, value: -7, to: Day.weekStart(now)) ?? now
-    model.deliveries = [
-      Delivery(
-        id: Day.key(lastWeek), start: lastWeek, end: Day.weekStart(now), clipCount: 6, duration: 18000,
-        seen: false)
-    ]
-    model.planOpen = true
-    model.now = now
-    model.applyLaunchArguments()
-    return model
+  /// Mac의 JSON 내보내기와 같은 모양. 데이터만 포함한다.
+  func exportData() -> Data {
+    (try? state.json.data()) ?? Data()
   }
 
-  /// 화면 확인용 실행 인자. 예: `-ui-tab calendar -ui-phase checkin`
+  /// 연동 중에는 추가·갱신 명령으로만 반영하고, 파일에 없는 항목을 지우지 않는다.
+  func importData(_ data: Data) {
+    do {
+      let raw = try JSON.parse(data)
+      if active, let engine {
+        Task {
+          do {
+            state = try await engine.importData(raw)
+            notify("데이터를 가져왔습니다.")
+          } catch {
+            notify(error.localizedDescription)
+          }
+        }
+        return
+      }
+      var next = try Domain.normalizeState(raw)
+      next.settings.trayDisplay = state.settings.trayDisplay
+      if let backup = try? state.json.data() {
+        try? backup.write(to: AppPaths.root.appendingPathComponent("local-state-backup.json"), options: .atomic)
+      }
+      state = next
+      try localStore.save(state)
+      notify("데이터를 가져왔습니다.")
+    } catch let error as DomainError {
+      notify(error.message)
+    } catch {
+      notify("파일을 읽을 수 없습니다.")
+    }
+  }
+
+  // MARK: 계정과 연동
+
+  private func cloudAccount() throws -> CloudAccount {
+    if let cloud { return cloud }
+    guard let url = Bundle.main.url(forResource: "Supabase", withExtension: "plist"),
+      let values = NSDictionary(contentsOf: url) as? [String: String],
+      let config = try CloudConfig.make(url: values["url"], key: values["publishableKey"])
+    else { throw DomainError("이 실행 환경에서는 계정 기능을 사용할 수 없습니다.") }
+    let cloud = CloudAccount(config: config)
+    self.cloud = cloud
+    return cloud
+  }
+
+  private func restoreAccount() async {
+    guard let cloud = try? cloudAccount() else { return }
+    account.configured = true
+    account.user = await cloud.restore()
+    if let user = account.user, FileEnvelopeRepository.exists(root: AppPaths.root, owner: user.id) {
+      try? connect(user: user, seed: nil)
+      if let engine, repository?.read().enabled == true { await engine.syncNow() }
+    }
+    Task { [weak self] in
+      for await user in cloud.changes {
+        guard let self else { return }
+        if self.account.user?.id != user?.id { self.account.user = user }
+      }
+    }
+  }
+
+  private func connect(user: AccountUser, seed: AppState?) throws {
+    if repository?.owner == user.id, engine != nil { return }
+    Task { [engine] in await engine?.destroy() }
+    let repository = try FileEnvelopeRepository(root: AppPaths.root, owner: user.id, seed: seed ?? SyncProtocol.emptyState())
+    let clock = SyncClock()
+    let engine = SyncEngine(
+      repository: repository, transport: try cloudAccount().transport(userId: user.id), clock: clock,
+      onChange: { [weak self] state, document, _ in
+        Task { @MainActor in
+          guard let self, self.active else { return }
+          try? CalendarTime.setZone(document.timeZone)
+          self.state = state
+        }
+      },
+      onStatus: { [weak self] status in
+        Task { @MainActor in self?.apply(status) }
+      })
+    self.repository = repository
+    self.engine = engine
+    self.syncClock = clock
+    active = true
+    state = SyncProtocol.projectedState(repository.read())
+    try? CalendarTime.setZone(repository.read().confirmed.timeZone)
+    Task {
+      await engine.start()
+      apply(await engine.status())
+    }
+  }
+
+  private func apply(_ status: SyncStatus) {
+    account.enabled = status.enabled
+    account.connection = status.connection
+    account.pending = status.pending
+    account.conflicts = status.conflicts
+    if !status.error.isEmpty || account.error == "동기화하지 못했습니다. 연결 상태를 확인하세요." || account.error == "다시 로그인하세요." {
+      account.error = status.error
+    }
+  }
+
+  func requestLink(email: String) {
+    Task {
+      account.busy = true
+      defer { account.busy = false }
+      do {
+        account.error = ""
+        try await cloudAccount().requestLink(email: email.trimmingCharacters(in: .whitespaces))
+        account.linkSent = true
+      } catch {
+        account.error = error.localizedDescription
+      }
+    }
+  }
+
+  /// 메일의 로그인 링크로 앱이 열렸다.
+  func handle(_ url: URL) {
+    guard url.scheme == "to3mato" else { return }
+    Task {
+      do {
+        let previous = repository?.owner
+        let wasEnabled = repository?.read().enabled == true
+        if let engine { try? await engine.disable() }
+        let user = try await cloudAccount().open(url)
+        account.user = user
+        account.linkSent = false
+        account.error = ""
+        if let previous, previous != user.id {
+          await engine?.destroy()
+          engine = nil
+          repository = nil
+          active = false
+          state = (try? localStore.load()) ?? state
+        } else if wasEnabled, let engine {
+          try await engine.enable()
+        }
+        if FileEnvelopeRepository.exists(root: AppPaths.root, owner: user.id), repository == nil {
+          try connect(user: user, seed: nil)
+        }
+      } catch {
+        account.error = error.localizedDescription
+      }
+    }
+  }
+
+  /// 이 기기의 연동을 켠다. 로컬 데이터는 처음 연동한 계정 하나에만 옮겨진다.
+  func enableSync() {
+    guard let user = account.user else { return }
+    Task {
+      account.busy = true
+      defer { account.busy = false }
+      do {
+        let binding = try? JSON.parse(Data(contentsOf: AppPaths.binding))
+        let seed = binding == nil ? try localStore.load() : nil
+        try connect(user: user, seed: seed)
+        if binding == nil {
+          try FileManager.default.createDirectory(at: AppPaths.root, withIntermediateDirectories: true)
+          try JSON.object(["owner": .string(user.id)]).data().write(to: AppPaths.binding, options: .atomic)
+        }
+        try repository?.backup()
+        try await engine?.enable()
+      } catch {
+        account.error = error.localizedDescription
+      }
+    }
+  }
+
+  func disableSync() {
+    Task { try? await engine?.disable() }
+  }
+
+  func syncNow() {
+    Task { await engine?.syncNow() }
+  }
+
+  func logout() {
+    Task {
+      if let engine {
+        try? await engine.disable()
+        await engine.destroy()
+      }
+      engine = nil
+      repository = nil
+      active = false
+      await cloud?.logout()
+      account.user = nil
+      account.enabled = false
+      account.connection = "off"
+      account.pending = 0
+      account.conflicts = []
+      account.error = ""
+      CalendarTime.zone = nil
+      state = (try? localStore.load()) ?? Domain.createInitialState()
+    }
+  }
+
+  func deleteAccount() {
+    Task {
+      do {
+        try await cloudAccount().deleteAccount()
+        logout()
+      } catch {
+        account.error = error.localizedDescription
+      }
+    }
+  }
+
+  func resolve(_ id: String, action: String) {
+    Task {
+      do { try await engine?.resolve(id, action: action) } catch { account.error = error.localizedDescription }
+    }
+  }
+
+  /// 앱이 다시 앞으로 나왔을 때 서버 시간과 상태를 다시 맞춘다.
+  func resume() {
+    syncClock.resume()
+    now = .now
+    syncNow()
+  }
+
+  // MARK: 화면 확인용 실행 인자. 예: `-ui-tab calendar -ui-phase checkin`
+
   private func applyLaunchArguments() {
     let defaults = UserDefaults.standard
     switch defaults.string(forKey: "ui-tab") {
@@ -433,17 +601,24 @@ extension AppModel {
     case "log": tab = .log
     default: break
     }
-    switch defaults.string(forKey: "ui-phase") {
-    case "focus":
-      timer = TimerState(taskId: "t1", duration: settings.focus, elapsed: 600, startedAt: now, running: true, phase: .focus)
-    case "checkin":
-      timer = TimerState(taskId: "t2", duration: settings.focus, elapsed: settings.focus, startedAt: now, running: false, phase: .checkin)
-      runSheetOpen = true
-    case "rest":
-      timer = TimerState(taskId: "t1", duration: settings.rest, elapsed: 60, startedAt: now, running: true, phase: .rest)
-    default: break
+    if let phase = defaults.string(forKey: "ui-phase"), let task = pendingToday.first ?? tasks.first(where: { !$0.done }) {
+      let at = nowMs
+      switch phase {
+      case "focus":
+        state.timer = TimerState(taskId: task.id, duration: settings.focus, elapsed: 600, startedAt: at, running: true, phase: .focus)
+      case "checkin":
+        state.timer = TimerState(taskId: task.id, duration: settings.focus, elapsed: settings.focus, startedAt: at, running: false, phase: .checkin)
+        runSheetOpen = true
+      case "rest":
+        state.timer = TimerState(taskId: nil, duration: settings.rest, elapsed: 60, startedAt: at, running: true, phase: .rest)
+      default: break
+      }
     }
     if defaults.bool(forKey: "ui-run") { runSheetOpen = true }
     if defaults.bool(forKey: "ui-review") { reviewOpen = true }
   }
+}
+
+enum AppTab: Hashable {
+  case todo, projects, calendar, log
 }

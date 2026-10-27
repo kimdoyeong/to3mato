@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 프로젝트 상세: 표지, 결과물, 숫자, 진행 막대, 남은 할 일, 다이어리(티켓 목록)
 struct ProjectDetailScreen: View {
@@ -112,10 +113,11 @@ struct ProjectDetailScreen: View {
   private func saveTemplate(_ project: Project) {
     let done = model.tickets.filter { $0.projectId == project.id && !$0.voided }
       .sorted { $0.completedAt < $1.completedAt }
-    model.templates.append(
-      TaskTemplate(
-        id: UUID().uuidString, name: project.name,
-        steps: done.map { TemplateStep(title: $0.title, estimate: min(AppModel.maxTaskEstimate, $0.estimate)) }))
+    model.saveTemplate(
+      id: nil, name: project.name,
+      steps: done.prefix(Domain.maxTemplateSteps).map {
+        TemplateStep(title: $0.title, estimate: min(AppModel.maxTaskEstimate, $0.estimate))
+      })
   }
 }
 
@@ -158,7 +160,7 @@ struct TicketView: View {
             .strikethrough(ticket.voided, color: Palette.strokeSoft)
           HStack(spacing: 6) {
             if let project { Chip(text: project.name, dot: project.tint) }
-            Text(Day.format(ticket.completedAt, "MMMMdEEEjjmm"))
+            Text(Day.format(ticket.completedDate, "MMMMdEEEjjmm"))
               .font(.hand(TextSize.xs))
               .foregroundStyle(Palette.muted)
               .lineLimit(1)
@@ -175,7 +177,7 @@ struct TicketView: View {
       .accessibilityLabel("\(ticket.title) 티켓 꾸미기")
 
       VStack(spacing: 0) {
-        Text("\(Day.calendar.component(.month, from: ticket.completedAt)).\(Day.calendar.component(.day, from: ticket.completedAt))")
+        Text("\(Day.calendar.component(.month, from: ticket.completedDate)).\(Day.calendar.component(.day, from: ticket.completedDate))")
         Text(ticket.voided ? "취소" : "완료")
       }
       .font(.hand(TextSize.xs))
@@ -190,10 +192,10 @@ struct TicketView: View {
     .clipShape(RoundedRectangle(cornerRadius: 10))
     .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.line, lineWidth: 2))
     .overlay(alignment: .topTrailing) {
-      if ticket.sticker != .none {
-        Image(systemName: AppIcon.symbol(ticket.sticker.rawValue))
+      if ticket.stickerKind != .none {
+        Image(systemName: AppIcon.symbol(ticket.sticker))
           .font(.system(size: 20))
-          .foregroundStyle(ticket.sticker == .star ? Palette.butterDeep : Palette.red)
+          .foregroundStyle(ticket.stickerKind == .star ? Palette.butterDeep : Palette.red)
           .rotationEffect(.degrees(12))
           .offset(x: 6, y: -10)
           .accessibilityHidden(true)
@@ -228,11 +230,11 @@ private struct TicketTools: View {
     if let ticket = model.tickets.first(where: { $0.id == ticketId }) {
       VStack(alignment: .leading, spacing: 10) {
         HStack(spacing: 8) {
-          Button("형광펜") { model.decorate(ticketId) { $0.highlight.toggle() } }
+          Button("형광펜") { model.updateTicket(ticketId, ["highlight": .bool(!ticket.highlight)]) }
             .buttonStyle(LineButtonStyle(pressed: ticket.highlight))
           ForEach(TicketSticker.allCases, id: \.self) { sticker in
             Button {
-              model.decorate(ticketId) { $0.sticker = sticker }
+              model.updateTicket(ticketId, ["sticker": .string(sticker.rawValue)])
             } label: {
               Image(systemName: sticker == .none ? "xmark" : AppIcon.symbol(sticker.rawValue))
                 .font(.system(size: 12))
@@ -240,12 +242,12 @@ private struct TicketTools: View {
             }
             .buttonStyle(StepButtonStyle())
             .accessibilityLabel("스티커 \(stickerLabel(sticker))")
-            .accessibilityAddTraits(ticket.sticker == sticker ? .isSelected : [])
+            .accessibilityAddTraits(ticket.stickerKind == sticker ? .isSelected : [])
           }
         }
         TextField("메모", text: $note)
           .fieldBox()
-          .onSubmit { model.decorate(ticketId) { $0.note = note } }
+          .onSubmit { model.updateTicket(ticketId, ["note": .string(note)]) }
       }
       .padding(14)
       .paper(radii: Wobble.b)

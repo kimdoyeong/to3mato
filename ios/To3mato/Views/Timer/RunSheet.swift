@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 실행 시트: iPhone에서 하단 타이머 바를 누르면 실행 영역을 시트로 올린다.
 struct RunSheet: View {

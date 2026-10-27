@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 계획 시작 카드: 어제 미완료, 오늘 가능, 미지정
 struct PlanCard: View {

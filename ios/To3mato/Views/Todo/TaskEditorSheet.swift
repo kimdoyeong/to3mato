@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 시트 공통 틀: 위쪽 조작 줄은 유리(툴바), 내용은 종이
 struct PaperSheet<Content: View>: View {
@@ -87,8 +88,7 @@ struct TaskEditorSheet: View {
             error = "할 일 이름을 입력하세요."
             return
           }
-          if !remainingTouched && used == 0 { draft.remaining = draft.estimate }
-          model.save(draft)
+          model.save(draft, remaining: remainingTouched ? draft.remaining : nil)
           dismiss()
         }
         .buttonStyle(PrimaryButtonStyle())

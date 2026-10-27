@@ -2,3 +2,8 @@ xcuserdata/
 DerivedData/
 build/
 *.xcuserstate
+
+# Supabase 연결 정보: node scripts/configure-ios-supabase.mjs로 만든다
+To3mato/Resources/Supabase.plist
+To3matoKit/.build/
+To3matoKit/.swiftpm/

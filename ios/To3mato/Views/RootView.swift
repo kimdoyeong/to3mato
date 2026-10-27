@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 유리 탭 바 네 개.
 /// iPhone은 어느 탭에서도 탭 바 위의 타이머 바가 유지된다.

@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 할 일 추가: 하나 추가, 여러 개 추가, 템플릿 모드를 한 시트에 둔다.
 struct AddTaskSheet: View {
@@ -173,8 +174,7 @@ private struct BatchForm: View {
           .buttonStyle(SecondaryButtonStyle())
         Spacer()
         Button("\(drafts.count)개 추가") {
-          model.addBatch(drafts)
-          model.notify("할 일을 추가했습니다.")
+          model.addBatch(drafts, project: project)
           dismiss()
         }
         .buttonStyle(PrimaryButtonStyle())
@@ -355,8 +355,17 @@ private struct TemplateForm: View {
           .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || steps.contains { $0.title.isEmpty })
         Spacer()
         Button("저장") {
-          let template = TaskTemplate(id: "", name: name, steps: steps)
-          for _ in 0..<rounds { model.apply(template, date: startDate, project: project) }
+          // 한 회차는 고른 요일 하루를 차지한다. 단계는 저장된 순서를 따른다.
+          let dates = scheduleDates(count: rounds, start: startDate, weekdays: weekdays)
+          let tasks = dates.enumerated().flatMap { round, date in
+            steps.map {
+              TaskItem(
+                id: "", title: $0.title.replacingOccurrences(of: "%n%", with: "\(round + 1)")
+                  .replacingOccurrences(of: "%date%", with: date),
+                estimate: $0.estimate, remaining: $0.estimate, date: date)
+            }
+          }
+          model.addBatch(tasks, project: project)
           dismiss()
         }
         .buttonStyle(PrimaryButtonStyle())
@@ -372,13 +381,24 @@ private struct TemplateForm: View {
   }
 
   private func saveTemplate() {
-    if let index = model.templates.firstIndex(where: { $0.id == selected }) {
-      model.templates[index].name = name
-      model.templates[index].steps = steps
-    } else {
-      let template = TaskTemplate(id: UUID().uuidString, name: name, steps: steps)
-      model.templates.append(template)
-      selected = template.id
+    let known = Set(model.templates.map(\.id))
+    model.saveTemplate(id: selected, name: name, steps: steps) {
+      if selected.isEmpty { selected = model.templates.first { !known.contains($0.id) }?.id ?? "" }
     }
   }
+}
+
+/// 시작 날짜부터 고른 요일에만 하루 하나씩 날짜를 고른다.
+func scheduleDates(count: Int, start: String, weekdays: Set<Int>) -> [String] {
+  guard !weekdays.isEmpty else { return [] }
+  var result: [String] = []
+  var date = start
+  var guardDays = 0
+  while result.count < count, guardDays < 3660 {
+    let weekday = (Day.calendar.component(.weekday, from: Day.date(date)) + 6) % 7
+    if weekdays.contains(weekday == 6 ? 0 : weekday + 1) { result.append(date) }
+    date = Day.offset(1, from: date)
+    guardDays += 1
+  }
+  return result
 }

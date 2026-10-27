@@ -1,5 +1,6 @@
 import PhotosUI
 import SwiftUI
+import To3matoCore
 
 /// 프로젝트: 표지 이미지 종이 카드의 세로 목록
 struct ProjectsScreen: View {
@@ -113,7 +114,7 @@ struct ProjectCover: View {
   var body: some View {
     ZStack(alignment: .bottomTrailing) {
       Group {
-        if let data = project.image, let image = UIImage(data: data) {
+        if let image = ProjectImages.image(named: project.image) {
           Image(uiImage: image).resizable().scaledToFill()
         } else {
           ZStack {
@@ -130,7 +131,7 @@ struct ProjectCover: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .clipShape(WobbleShape(radii: Wobble.s))
       .accessibilityElement()
-      .accessibilityLabel(project.image == nil ? "\(project.name) 기본 표지" : "\(project.name) 표지 이미지")
+      .accessibilityLabel(project.image.isEmpty ? "\(project.name) 기본 표지" : "\(project.name) 표지 이미지")
 
       PhotosPicker(selection: $pick, matching: .images) {
         Text("이미지 변경")

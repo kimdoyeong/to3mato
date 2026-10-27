@@ -1,98 +1,32 @@
 import Foundation
 import SwiftUI
+import To3matoCloud
+import To3matoCore
 
-// Mac의 src/lib/types.ts와 같은 모양. 날짜는 `yyyy-MM-dd` 문자열, 미지정은 빈 문자열이다.
+// 할 일, 프로젝트, 기록, 티켓, 템플릿, 타이머, 설정 타입은 To3matoCore에 있다.
+// 여기에는 화면에서만 쓰는 값과 변환을 둔다.
 
-struct TaskItem: Identifiable, Hashable {
-  var id: String
-  var title: String
-  var estimate: Int
-  var remaining: Int
-  var followUpOf = ""
-  var project: String
-  var date: String
-  var done = false
-}
+typealias TodoSection = Domain.TodoSection
 
-struct Project: Identifiable, Hashable {
-  var id: String
-  var name: String
-  var icon: String
-  var color: String
-  var outcome = ""
-  var image: Data?
-
+extension Project {
   var tint: Color { Color(hexString: color) }
 }
 
-struct FocusRecord: Identifiable, Hashable {
-  var id: String
-  var taskId: String
-  var seconds: Double
-  var pomodoros: Double
-  var duration: Double
-  var at: Date
+extension FocusRecord {
+  var date: Date { Date(timeIntervalSince1970: at / 1000) }
 }
 
 enum TicketSticker: String, CaseIterable {
   case none = "", star, heart, leaf
 }
 
-struct Ticket: Identifiable, Hashable {
-  var id: String
-  var taskId: String
-  var title: String
-  var projectId: String
-  var completedAt: Date
-  var estimate: Int
-  var used: Double
-  var note = ""
-  var highlight = false
-  var sticker: TicketSticker = .none
-  var voided = false
+extension Ticket {
+  var completedDate: Date { Date(timeIntervalSince1970: completedAt / 1000) }
+  var stickerKind: TicketSticker { TicketSticker(rawValue: sticker) ?? .none }
 }
 
-struct TemplateStep: Hashable {
-  var title: String
-  var estimate: Int
-}
-
-struct TaskTemplate: Identifiable, Hashable {
-  var id: String
-  var name: String
-  var steps: [TemplateStep]
-}
-
-enum TimerPhase { case focus, checkin, rest }
-
-struct TimerState: Equatable {
-  var taskId: String?
-  var duration: Double
-  var elapsed: Double
-  var startedAt: Date
-  var running: Bool
-  var phase: TimerPhase
-
-  func elapsedSeconds(at now: Date) -> Double {
-    elapsed + (running ? now.timeIntervalSince(startedAt) : 0)
-  }
-}
-
-struct Settings: Equatable {
-  var focus: Double = 1500
-  var rest: Double = 300
-  var dailyCapacity = 8
-  var planAt: Date?
-  var reviewAt: Date?
-  var remindDays: Set<Int> = [1, 2, 3, 4, 5]
-}
-
-/// 같은 섹션 규칙: 오늘, 내일, 할 일이 있는 날짜, 미완료가 있는 지난 날짜, 미지정
-struct TodoSection: Identifiable {
-  var date: String
-  var label: String
-  var tasks: [TaskItem]
-  var id: String { date.isEmpty ? "backlog" : date }
+extension TimerState {
+  func elapsedSeconds(at date: Date) -> Double { Domain.elapsedSeconds(self, epochMilliseconds(date)) }
 }
 
 struct ProjectSummary {
@@ -110,7 +44,7 @@ struct TicketWeek: Identifiable {
   var tickets: [Ticket]
 }
 
-/// 집중 로그의 3초 영상. UI 단계에서는 썸네일 자리만 그린다.
+/// 집중 로그의 3초 영상. 촬영과 전송은 다음 단계에서 붙인다.
 struct Clip: Identifiable, Hashable {
   var id: String
   var taskTitle: String
@@ -125,4 +59,52 @@ struct Delivery: Identifiable, Hashable {
   var clipCount: Int
   var duration: Double
   var seen: Bool
+}
+
+/// 계정과 연동 상태. Mac의 AccountStatus와 같은 항목이다.
+struct AccountState: Equatable {
+  var configured = false
+  var user: AccountUser?
+  var enabled = false
+  var connection = "off"
+  var pending = 0
+  var conflicts: [JSON] = []
+  var error = ""
+  var linkSent = false
+  var busy = false
+}
+
+/// 프로젝트 표지 이미지. 기기 안에 저장하고 프로젝트에는 파일 이름만 둔다.
+enum ProjectImages {
+  static var directory: URL {
+    AppPaths.root.appendingPathComponent("project-images", isDirectory: true)
+  }
+
+  static func image(named name: String) -> UIImage? {
+    guard !name.isEmpty else { return nil }
+    return UIImage(contentsOfFile: directory.appendingPathComponent(name).path)
+  }
+
+  /// JPEG로 줄여 저장하고 파일 이름을 돌려준다.
+  static func store(_ data: Data) throws -> String {
+    guard let image = UIImage(data: data) else { throw DomainError("입력 내용을 확인하세요.") }
+    let scale = min(1, 1600 / max(image.size.width, image.size.height))
+    let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+    let resized = UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+    guard let jpeg = resized.jpegData(compressionQuality: 0.85) else { throw DomainError("입력 내용을 확인하세요.") }
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let name = "cover-\(IDs.make()).jpg"
+    try jpeg.write(to: directory.appendingPathComponent(name), options: .atomic)
+    return name
+  }
+}
+
+enum AppPaths {
+  static var root: URL {
+    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    return base.appendingPathComponent("To3mato", isDirectory: true)
+  }
+
+  static var localState: URL { root.appendingPathComponent("local-state.json") }
+  static var binding: URL { root.appendingPathComponent("account-binding.json") }
 }

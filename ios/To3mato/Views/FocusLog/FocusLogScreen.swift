@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 집중 로그: 주 이동, 이번 주 섬, 영상 편지, 클립 목록
 struct FocusLogScreen: View {
@@ -10,7 +11,7 @@ struct FocusLogScreen: View {
     let end = Day.calendar.date(byAdding: .day, value: 7, to: start) ?? start
     let last = end.addingTimeInterval(-1)
     let clips = model.clips.filter { $0.at >= start && $0.at < end }
-    let records = model.records.filter { $0.at >= start && $0.at < end }
+    let records = model.records.filter { $0.date >= start && $0.date < end }
     let days = Set(clips.map { Day.key($0.at) }).count
 
     NavigationStack {

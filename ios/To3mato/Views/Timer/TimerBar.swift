@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 하단 타이머 바: 두 줄 높이의 유리 바.
 /// 왼쪽부터 현재 할 일 제목, 남은 시간, 재생·일시정지, 종료.

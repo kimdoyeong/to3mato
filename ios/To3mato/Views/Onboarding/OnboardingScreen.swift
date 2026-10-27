@@ -1,8 +1,10 @@
 import SwiftUI
+import To3matoCore
 
 /// 첫 실행 안내 4단계와 계정 단계. 문구는 Mac의 Onboarding과 같다.
 struct OnboardingScreen: View {
   let finish: () -> Void
+  @Environment(AppModel.self) private var model
   @State private var step = 0
 
   private let intro: [(title: String, body: [String])] = [
@@ -45,12 +47,19 @@ struct OnboardingScreen: View {
           }
         } else {
           SectionTitle(title: "계정", size: TextSize.title)
-          Text("연동하면 다른 기기와 동기화되어 사용하실 수 있습니다.")
-            .font(.hand(TextSize.md))
-            .foregroundStyle(Palette.muted)
-            .multilineTextAlignment(.center)
-          AuthForm()
-            .padding(.top, 8)
+          if !model.account.configured {
+            body("이 실행 환경에서는 계정 기능을 사용할 수 없습니다.")
+          } else if let user = model.account.user {
+            body(user.email ?? "")
+            if !model.account.enabled { body("연동하면 다른 기기와 동기화되어 사용하실 수 있습니다.") }
+          } else {
+            body("연동하면 다른 기기와 동기화되어 사용하실 수 있습니다.")
+            AuthForm()
+              .padding(.top, 8)
+          }
+          if !model.account.error.isEmpty {
+            FormError(text: model.account.error)
+          }
         }
       }
       .padding(.horizontal, 24)
@@ -74,7 +83,18 @@ struct OnboardingScreen: View {
         } else {
           Button("이전") { step -= 1 }.buttonStyle(LineButtonStyle())
           Spacer()
-          Button("로그인 없이 시작", action: finish).buttonStyle(TextButtonStyle())
+          if !model.account.configured || model.account.enabled {
+            Button("시작", action: finish).buttonStyle(PrimaryButtonStyle())
+          } else if model.account.user == nil {
+            Button("로그인 없이 시작", action: finish).buttonStyle(TextButtonStyle())
+          } else {
+            Button("나중에", action: finish).buttonStyle(TextButtonStyle())
+            Button("연동") {
+              model.enableSync()
+              finish()
+            }
+            .buttonStyle(PrimaryButtonStyle())
+          }
         }
       }
       .frame(maxWidth: 560)
@@ -82,6 +102,13 @@ struct OnboardingScreen: View {
       .padding(.bottom, 20)
     }
     .background(DotBackground())
+  }
+
+  private func body(_ text: String) -> some View {
+    Text(text)
+      .font(.hand(TextSize.md))
+      .foregroundStyle(Palette.muted)
+      .multilineTextAlignment(.center)
   }
 
   @ViewBuilder private var art: some View {

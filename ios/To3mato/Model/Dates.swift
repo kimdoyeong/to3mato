@@ -1,4 +1,5 @@
 import Foundation
+import To3matoCore
 
 /// Mac의 localDate, offsetDate, dateLabel과 같은 날짜 규칙
 enum Day {
@@ -17,7 +18,8 @@ enum Day {
     return formatter
   }()
 
-  static func key(_ date: Date = .now) -> String { keyFormatter.string(from: date) }
+  /// 계정 시간대(없으면 기기 시간대)의 날짜
+  static func key(_ date: Date = .now) -> String { CalendarTime.dateInZone(date) }
 
   static func date(_ key: String) -> Date {
     let day = keyFormatter.date(from: key) ?? .now
@@ -25,7 +27,7 @@ enum Day {
   }
 
   static func offset(_ days: Int, from key: String = Day.key()) -> String {
-    Day.key(calendar.date(byAdding: .day, value: days, to: date(key)) ?? .now)
+    CalendarTime.shiftDay(key, days)
   }
 
   static func format(_ date: Date, _ template: String) -> String {

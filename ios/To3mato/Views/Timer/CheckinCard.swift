@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 진척 확인: 집중이 끝나면 타이머 판 자리에 들어간다.
 struct CheckinCard: View {

@@ -1,4 +1,5 @@
 import SwiftUI
+import To3matoCore
 
 /// 캘린더: 가로 스크롤 요일 띠와 선택한 날의 할 일 목록.
 /// 할 일 행을 길게 눌러 요일 칸에 놓으면 예정일을 옮긴다.

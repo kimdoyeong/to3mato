@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C10000000000000000000004 /* To3matoCore in Frameworks */ = {isa = PBXBuildFile; productRef = C10000000000000000000002 /* To3matoCore */; };
+		C10000000000000000000005 /* To3matoCloud in Frameworks */ = {isa = PBXBuildFile; productRef = C10000000000000000000003 /* To3matoCloud */; };
 		B10000000000000000000010 /* To3matoLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* To3matoLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -69,6 +71,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C10000000000000000000004 /* To3matoCore in Frameworks */,
+				C10000000000000000000005 /* To3matoCloud in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,6 +144,8 @@
 			);
 			name = To3mato;
 			packageProductDependencies = (
+				C10000000000000000000002 /* To3matoCore */,
+				C10000000000000000000003 /* To3matoCloud */,
 			);
 			productName = To3mato;
 			productReference = A10000000000000000000001 /* To3mato.app */;
@@ -172,6 +178,9 @@
 			);
 			mainGroup = A10000000000000000000004;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C10000000000000000000001 /* XCLocalSwiftPackageReference "To3matoKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000005 /* Products */;
 			projectDirPath = "";
@@ -334,6 +343,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "To3mato-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = To3mato;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -366,6 +376,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "To3mato-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = To3mato;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -420,6 +431,24 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		C10000000000000000000001 /* XCLocalSwiftPackageReference "To3matoKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = To3matoKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C10000000000000000000002 /* To3matoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = To3matoCore;
+		};
+		C10000000000000000000003 /* To3matoCloud */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = To3matoCloud;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A10000000000000000000009 /* Project object */;
 }
