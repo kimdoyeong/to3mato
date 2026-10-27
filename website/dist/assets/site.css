@@ -1967,3 +1967,18 @@ code em {
 .release-notes ul { padding-left: 22px; color: var(--muted); line-height: 2; margin-block: 20px; }
 @media (max-width: 850px) { .capability-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .delivery-steps, .capability-grid { grid-template-columns: 1fr; gap: 20px; } .weekly-envelope { transform: none; } .weekly-feature .feature-grid { gap: 36px; } }
+.legal { max-width: 760px; padding-block: clamp(48px, 7vw, 88px); }
+.legal h1 { font-size: clamp(32px, 4vw, 44px); }
+.legal-date { font-size: 14px; margin: 12px 0 32px; }
+.legal section { padding-top: 36px; margin-top: 36px; border-top: 1px solid var(--line); }
+.legal h2 { font-size: 22px; margin-bottom: 14px; }
+.legal p, .legal li { line-height: 1.85; }
+.legal p + p, .legal ul + p, .legal .legal-table + p { margin-top: 14px; }
+.legal ul { padding-left: 22px; color: var(--muted); }
+.legal a { color: var(--red); overflow-wrap: anywhere; }
+.legal-table { overflow-x: auto; margin-block: 18px; }
+.legal table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 14px; line-height: 1.7; }
+.legal th, .legal td { text-align: left; vertical-align: top; padding: 12px; border-bottom: 1px solid var(--line); }
+.legal thead th { color: var(--ink); border-bottom-width: 2px; }
+.legal tbody th { color: var(--ink); font-weight: 650; }
+.legal td { color: var(--muted); }

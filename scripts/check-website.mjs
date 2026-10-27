@@ -19,7 +19,13 @@ try {
   const files = new Set();
   for (const width of [1440, 768, 390, 320]) {
     await page.setViewportSize({ width, height: width < 700 ? 844 : 1000 });
-    for (const file of ['index.html', 'about.html', 'download.html']) {
+    for (const file of [
+      'index.html',
+      'about.html',
+      'download.html',
+      'privacy.html',
+      'terms.html',
+    ]) {
       const response = await page.goto(`${base}/${file}`);
       assert.equal(response.status(), 200);
       await page.evaluate(() => document.fonts.ready);
@@ -55,7 +61,12 @@ try {
             await page.locator(ref).count(),
             `${file} missing anchor ${ref}`,
           );
-        else files.add(new URL(ref, `${base}/${file}`).href.split('#')[0]);
+        else {
+          // Legal pages link to mail and outside policies; only own files are checked.
+          const url = new URL(ref, `${base}/${file}`);
+          if (url.origin === new URL(base).origin)
+            files.add(url.href.split('#')[0]);
+        }
       }
       if (width === 1440 || width === 390)
         await page.screenshot({
@@ -138,7 +149,7 @@ try {
   );
   console.log(
     JSON.stringify({
-      pages: 3,
+      pages: 5,
       viewports: [1440, 768, 390, 320],
       resources: files.size,
       downloadVerified: sha,
