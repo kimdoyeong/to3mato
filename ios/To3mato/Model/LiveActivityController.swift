@@ -20,7 +20,9 @@ final class LiveActivityController {
       return
     }
     guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-    let content = ActivityContent(state: state(model, timer), staleDate: nil)
+    let value = state(model, timer)
+    // 진행 중이면 종료 시각에 만료되어, 앱이 멈춰 있어도 00:00과 조작 버튼이 남지 않는다.
+    let content = ActivityContent(state: value, staleDate: value.running ? value.endsAt : nil)
     let taskId = timer.taskId ?? ""
     if let activity, activity.attributes.taskId == taskId {
       Task { await activity.update(content) }

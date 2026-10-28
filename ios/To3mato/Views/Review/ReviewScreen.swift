@@ -109,7 +109,10 @@ struct ReviewScreen: View {
 
           HStack {
             Spacer()
-            Button("저장") { dismiss() }
+            Button("저장") {
+              model.finishRitual("review")
+              dismiss()
+            }
               .buttonStyle(PrimaryButtonStyle())
           }
         }

@@ -24,6 +24,16 @@ nonisolated struct TimerActivityAttributes: ActivityAttributes {
     var used: Double
 
     var clock: String { String(format: "%02d:%02d", remaining / 60, remaining % 60) }
+
+    /// 종료 시각이 지났는데 앱이 아직 갱신하지 못했을 때 보여줄 상태. 집중은 진척 확인, 휴식은 집중 대기로 넘어간다.
+    var expired: Self {
+      var next = self
+      next.running = false
+      next.remaining = 0
+      next.startedAt = endsAt
+      next.status = phase == .rest ? "집중 대기" : "진척 확인"
+      return next
+    }
     var progress: Double {
       let total = endsAt.timeIntervalSince(startedAt)
       return total > 0 ? min(1, max(0, 1 - Double(remaining) / total)) : 0

@@ -17,7 +17,9 @@ final class AppModel {
       if state.timer != oldValue.timer {
         liveActivity.sync(self)
         notifications.sync(self)
+        if state.timer?.phase == .checkin, oldValue.timer?.phase != .checkin { runSheetOpen = true }
       }
+      if state.settings != oldValue.settings { notifications.syncReminders(self) }
     }
   }
   var now = Date.now
@@ -30,6 +32,9 @@ final class AppModel {
   var runSheetOpen = false
   var reviewOpen = false
   var planOpen = false
+  /// 계획·돌아보기를 마친 날짜. 연동 중에는 계정의 rituals 항목에서 읽는다.
+  var plannedDate = ""
+  var reviewedDate = ""
   var toast: String?
 
   @ObservationIgnored private let liveActivity = LiveActivityController()
@@ -40,7 +45,7 @@ final class AppModel {
   @ObservationIgnored private var repository: FileEnvelopeRepository?
   @ObservationIgnored private var syncClock = SyncClock()
   /// 계정 저장소를 보여주는 중인지. 연동을 꺼도 로그인 상태면 계정 데이터를 보여준다(Mac과 같음).
-  @ObservationIgnored private var active = false
+  private var active = false
   @ObservationIgnored private var advancing = false
 
   // MARK: 파생 값
@@ -54,7 +59,11 @@ final class AppModel {
   var settings: Settings { state.settings }
 
   /// 명령에 쓰는 현재 시각(ms). 연동 중에는 서버 시간으로 보정한다.
-  var nowMs: Double { active ? syncClock.now() : epochMilliseconds(now) }
+  var nowMs: Double {
+    // now는 매초 바뀌는 관찰 값이다. 연동 중에는 서버 시간과의 차이만 더한다.
+    let base = epochMilliseconds(now)
+    return active ? base + (syncClock.now() - epochMilliseconds()) : base
+  }
 
   var today: String { Domain.localDate(Date(timeIntervalSince1970: nowMs / 1000)) }
 
@@ -120,10 +129,86 @@ final class AppModel {
     return weeks
   }
 
+  /// 오늘 앞의 7일 평균. Mac의 sevenDayAverage()와 같이 정수로 반올림한다.
   func sevenDayAverage() -> String {
-    let total = (1...7).reduce(0.0) { $0 + doneOn(Day.offset(-$1, from: today)) }
-    let value = (total / 7 * 10).rounded() / 10
-    return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+    let first = Day.offset(-7, from: today)
+    let sum = records.reduce(0.0) { total, record in
+      let date = Domain.localDate(record.date)
+      return date >= first && date < today ? total + record.pomodoros : total
+    }
+    return String(Int((sum / 7).rounded(.toNearestOrAwayFromZero)))
+  }
+
+  // MARK: 계획·돌아보기
+
+  /// 계획 카드는 계획 알림과 같은 규칙으로 저절로 열린다.
+  var planIsDue: Bool {
+    guard !settings.planAt.isEmpty, settings.remindDays.contains(Self.weekday(today)) else { return false }
+    return Self.clockTime(Date(timeIntervalSince1970: nowMs / 1000)) >= settings.planAt && plannedDate != today
+  }
+
+  /// `YYYY-MM-DD`의 요일. 일요일이 0이다.
+  static func weekday(_ day: String) -> Int {
+    guard let noon = CalendarTime.utcNoon(day) else { return -1 }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "UTC")!
+    return calendar.component(.weekday, from: noon) - 1
+  }
+
+  /// 계정 시간대의 "HH:mm"
+  static func clockTime(_ date: Date) -> String {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = CalendarTime.zone ?? .current
+    let parts = calendar.dateComponents([.hour, .minute], from: date)
+    return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+  }
+
+  private var ritualKey: String { "to3mato-rituals-v1" + (active ? ":\(repository?.owner ?? "")" : "") }
+
+  private func loadLocalRituals() {
+    let dates = UserDefaults.standard.dictionary(forKey: ritualKey) as? [String: String]
+    plannedDate = dates?["plannedDate"] ?? ""
+    reviewedDate = dates?["reviewedDate"] ?? ""
+  }
+
+  private func applyRituals(_ document: SyncDocument) {
+    func latest(_ kind: String) -> String {
+      (document.extras["rituals"] ?? []).filter { $0["kind"]?.string == kind }.compactMap { $0["date"]?.string }.max() ?? ""
+    }
+    plannedDate = latest("plan")
+    reviewedDate = latest("review")
+    notifications.syncReminders(self)
+  }
+
+  /// 오늘 계획 또는 돌아보기를 마쳤다. 연동 중이면 다른 기기에도 알린다.
+  func finishRitual(_ kind: String) {
+    let date = today
+    if kind == "plan" {
+      plannedDate = date
+      planOpen = false
+    } else {
+      reviewedDate = date
+    }
+    if active, let engine {
+      Task {
+        try? await engine.extra(
+          entity: "rituals", id: "\(date):\(kind)", fields: ["kind": .string(kind), "date": .string(date)])
+      }
+    } else {
+      UserDefaults.standard.set(["plannedDate": plannedDate, "reviewedDate": reviewedDate], forKey: ritualKey)
+    }
+    notifications.syncReminders(self)
+  }
+
+  /// 알림을 눌러 계획 카드나 돌아보기를 연다.
+  func openRitual(_ kind: String) {
+    if kind == "plan" {
+      tab = .todo
+      reviewOpen = false
+      planOpen = true
+    } else {
+      reviewOpen = true
+    }
   }
 
   // MARK: 시작
@@ -135,6 +220,8 @@ final class AppModel {
     } catch {
       notify(error.localizedDescription)
     }
+    loadLocalRituals()
+    notifications.syncReminders(self)
     applyLaunchArguments()
     Task { await restoreAccount() }
   }
@@ -275,6 +362,12 @@ final class AppModel {
       let parts = Calendar.current.dateComponents([.hour, .minute], from: $0)
       return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
     } ?? ""
+    if date != nil {
+      notifications.requestPermission { [weak self] in
+        guard let self else { return }
+        self.notifications.syncReminders(self)
+      }
+    }
     saveSettings([key: .string(value)])
   }
 
@@ -291,16 +384,14 @@ final class AppModel {
 
   func tick(_ date: Date) {
     now = date
+    if !planOpen, planIsDue { planOpen = true }
     guard let timer, timer.running, Domain.elapsedSeconds(timer, nowMs) >= timer.duration else { return }
     if active, let engine {
       guard !advancing else { return }
       advancing = true
       Task {
         defer { advancing = false }
-        if let next = try? await engine.dispatch(Command("timer:advance")) {
-          state = next
-          if next.timer?.phase == .checkin { runSheetOpen = true }
-        }
+        if let next = try? await engine.dispatch(Command("timer:advance")) { state = next }
       }
       return
     }
@@ -308,7 +399,6 @@ final class AppModel {
     guard Domain.advanceTimer(&next, nowMs) else { return }
     state = next
     try? localStore.save(state)
-    if next.timer?.phase == .checkin { runSheetOpen = true }
   }
 
   func play(_ taskId: String) {
@@ -317,11 +407,15 @@ final class AppModel {
       return
     }
     let before = records.count
+    notifications.requestPermission { [weak self] in
+      guard let self else { return }
+      self.notifications.sync(self)
+      self.notifications.syncReminders(self)
+    }
     send(Command("timer:play", ["id": .string(taskId)])) { [weak self] in
       guard let self, self.records.count > before, let last = self.records.last else { return }
       self.notify("\(last.pomodoros.pomodoroText)포모도로 기록 · 새 타이머 시작")
     }
-    notifications.requestPermission()
   }
 
   func toggleTimer() {
@@ -445,6 +539,7 @@ final class AppModel {
           guard let self, self.active else { return }
           try? CalendarTime.setZone(document.timeZone)
           self.state = state
+          self.applyRituals(document)
         }
       },
       onStatus: { [weak self] status in
@@ -456,6 +551,7 @@ final class AppModel {
     active = true
     state = SyncProtocol.projectedState(repository.read())
     try? CalendarTime.setZone(repository.read().confirmed.timeZone)
+    applyRituals(SyncProtocol.projectedDocument(repository.read()))
     Task {
       await engine.start()
       apply(await engine.status())
@@ -488,12 +584,14 @@ final class AppModel {
 
   /// 메일의 로그인 링크로 앱이 열렸다.
   func handle(_ url: URL) {
-    guard url.scheme == "to3mato" else { return }
+    // 이미 로그인했으면 지난 메일의 링크로 계정을 바꾸지 않는다(Mac과 같음).
+    guard url.scheme == "to3mato", account.user == nil else { return }
     Task {
+      let previous = repository?.owner
+      let wasEnabled = repository?.read().enabled == true
+      // 인증 정보를 바꾸기 전에 전송을 멈춘다.
+      if let engine { try? await engine.disable() }
       do {
-        let previous = repository?.owner
-        let wasEnabled = repository?.read().enabled == true
-        if let engine { try? await engine.disable() }
         let user = try await cloudAccount().open(url)
         account.user = user
         account.linkSent = false
@@ -502,8 +600,7 @@ final class AppModel {
           await engine?.destroy()
           engine = nil
           repository = nil
-          active = false
-          state = (try? localStore.load()) ?? state
+          showLocalData()
         } else if wasEnabled, let engine {
           try await engine.enable()
         }
@@ -511,6 +608,7 @@ final class AppModel {
           try connect(user: user, seed: nil)
         }
       } catch {
+        if wasEnabled, let engine { try? await engine.enable() }
         account.error = error.localizedDescription
       }
     }
@@ -547,24 +645,33 @@ final class AppModel {
   }
 
   func logout() {
+    // 기기 데이터로 먼저 돌아간다. 네트워크 로그아웃을 기다리는 동안 계정 데이터가 기기 파일에 저장되지 않게 한다.
+    let engine = engine
+    self.engine = nil
+    repository = nil
+    showLocalData()
+    account.user = nil
+    account.enabled = false
+    account.connection = "off"
+    account.pending = 0
+    account.conflicts = []
+    account.error = ""
     Task {
       if let engine {
         try? await engine.disable()
         await engine.destroy()
       }
-      engine = nil
-      repository = nil
-      active = false
       await cloud?.logout()
-      account.user = nil
-      account.enabled = false
-      account.connection = "off"
-      account.pending = 0
-      account.conflicts = []
-      account.error = ""
-      CalendarTime.zone = nil
-      state = (try? localStore.load()) ?? Domain.createInitialState()
     }
+  }
+
+  /// 계정 저장소에서 빠져나와 이 기기의 데이터를 보여준다.
+  private func showLocalData() {
+    active = false
+    CalendarTime.zone = nil
+    state = (try? localStore.load()) ?? Domain.createInitialState()
+    loadLocalRituals()
+    notifications.syncReminders(self)
   }
 
   func deleteAccount() {

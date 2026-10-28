@@ -148,6 +148,7 @@ struct TaskFields: View {
               selection: Binding(get: { Day.date(draft.date) }, set: { draft.date = Day.key($0) }),
               displayedComponents: .date
             )
+            .environment(\.timeZone, Day.zone)
             .labelsHidden()
             .environment(\.locale, Locale(identifier: "ko_KR"))
             Button {

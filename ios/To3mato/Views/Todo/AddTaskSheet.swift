@@ -129,6 +129,7 @@ private struct BatchForm: View {
             "시작 날짜", selection: Binding(get: { Day.date(startDate) }, set: { startDate = Day.key($0) }),
             displayedComponents: .date
           )
+          .environment(\.timeZone, Day.zone)
           .labelsHidden()
         }
         numberField("하루 기본 개수", value: $perDay, range: 1...AppModel.maxBatchSize)
@@ -200,8 +201,8 @@ private struct BatchForm: View {
     var placed = 0
     var guardDays = 0
     while result.count < count, guardDays < 3660 {
-      let weekday = (Day.calendar.component(.weekday, from: Day.date(date)) + 6) % 7
-      let id = weekday == 6 ? 0 : weekday + 1
+      // Mac의 getDay()와 같이 일요일이 0이다.
+      let id = Day.calendar.component(.weekday, from: Day.date(date)) - 1
       if weekdays.contains(id), placed < perDay {
         let n = result.count + 1
         let title = template
@@ -261,7 +262,7 @@ private struct TemplateForm: View {
   @State var startDate: String
   @State private var selected = ""
   @State private var name = ""
-  @State private var steps = [TemplateStep(title: "", estimate: 1)]
+  @State private var steps = [StepDraft()]
   @State private var rounds = 1
   @State private var weekdays: Set<Int> = [1, 2, 3, 4, 5]
 
@@ -286,19 +287,20 @@ private struct TemplateForm: View {
       }
 
       VStack(alignment: .leading, spacing: 8) {
-        ForEach(steps.indices, id: \.self) { index in
+        ForEach($steps) { $step in
+          let index = steps.firstIndex { $0.id == step.id } ?? 0
           HStack(spacing: 8) {
             Text("\(index + 1)").font(.hand(TextSize.sm)).foregroundStyle(Palette.muted).frame(width: 18)
-            TextField("단계 \(index + 1)", text: $steps[index].title)
+            TextField("단계 \(index + 1)", text: $step.title)
               .fieldBox()
-            EstimatePicker(value: steps[index].estimate) { steps[index].estimate = $0 }
-            Button("삭제") { steps.remove(at: index) }
+            EstimatePicker(value: step.estimate) { step.estimate = $0 }
+            Button("삭제") { steps.removeAll { $0.id == step.id } }
               .buttonStyle(TextButtonStyle(size: TextSize.sm))
               .disabled(steps.count == 1)
               .accessibilityLabel("단계 \(index + 1) 삭제")
           }
         }
-        Button("단계 추가") { steps.append(TemplateStep(title: "", estimate: 1)) }
+        Button("단계 추가") { steps.append(StepDraft()) }
           .buttonStyle(DashButtonStyle())
           .disabled(steps.count >= 20)
       }
@@ -317,6 +319,7 @@ private struct TemplateForm: View {
             "시작일", selection: Binding(get: { Day.date(startDate) }, set: { startDate = Day.key($0) }),
             displayedComponents: .date
           )
+          .environment(\.timeZone, Day.zone)
           .labelsHidden()
         }
       }
@@ -377,15 +380,22 @@ private struct TemplateForm: View {
   private func select(_ template: TaskTemplate?) {
     selected = template?.id ?? ""
     name = template?.name ?? ""
-    steps = template?.steps ?? [TemplateStep(title: "", estimate: 1)]
+    steps = template?.steps.map { StepDraft(title: $0.title, estimate: $0.estimate) } ?? [StepDraft()]
   }
 
   private func saveTemplate() {
     let known = Set(model.templates.map(\.id))
-    model.saveTemplate(id: selected, name: name, steps: steps) {
+    model.saveTemplate(id: selected, name: name, steps: steps.map { TemplateStep(title: $0.title, estimate: $0.estimate) }) {
       if selected.isEmpty { selected = model.templates.first { !known.contains($0.id) }?.id ?? "" }
     }
   }
+}
+
+/// 편집 중인 템플릿 단계. 삭제해도 다른 행과 섞이지 않도록 고유 id를 둔다.
+private struct StepDraft: Identifiable {
+  let id = UUID()
+  var title = ""
+  var estimate = 1
 }
 
 /// 시작 날짜부터 고른 요일에만 하루 하나씩 날짜를 고른다.
@@ -395,8 +405,8 @@ func scheduleDates(count: Int, start: String, weekdays: Set<Int>) -> [String] {
   var date = start
   var guardDays = 0
   while result.count < count, guardDays < 3660 {
-    let weekday = (Day.calendar.component(.weekday, from: Day.date(date)) + 6) % 7
-    if weekdays.contains(weekday == 6 ? 0 : weekday + 1) { result.append(date) }
+    // Mac의 getDay()와 같이 일요일이 0이다.
+    if weekdays.contains(Day.calendar.component(.weekday, from: Day.date(date)) - 1) { result.append(date) }
     date = Day.offset(1, from: date)
     guardDays += 1
   }

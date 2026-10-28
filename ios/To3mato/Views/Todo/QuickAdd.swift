@@ -56,7 +56,6 @@ struct QuickAdd: View {
       return
     }
     model.addTask(title: title, date: date, project: project)
-    model.notify("할 일을 추가했습니다.")
     title = ""
     focused = true
   }

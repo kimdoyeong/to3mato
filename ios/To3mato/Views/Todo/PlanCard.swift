@@ -15,7 +15,7 @@ struct PlanCard: View {
         SectionTitle(title: "계획 시작", size: TextSize.title)
         Spacer()
         Button {
-          withAnimation { model.planOpen = false }
+          withAnimation { model.finishRitual("plan") }
         } label: {
           Image(systemName: "xmark")
         }

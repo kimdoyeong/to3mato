@@ -13,10 +13,11 @@ struct To3matoLiveActivityBundle: WidgetBundle {
 struct TimerLiveActivity: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: TimerActivityAttributes.self) { context in
-      LockScreenView(state: context.state)
+      LockScreenView(state: context.isStale ? context.state.expired : context.state)
         .activitySystemActionForegroundColor(LiveTomato.red)
     } dynamicIsland: { context in
-      let state = context.state
+      let state = context.isStale ? context.state.expired : context.state
+      let controls = !context.isStale && state.phase != .checkin
       return DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
           HStack(spacing: 8) {
@@ -42,7 +43,7 @@ struct TimerLiveActivity: Widget {
                 .lineLimit(1)
               ProgressBar(state: state)
             }
-            if state.phase != .checkin {
+            if controls {
               Controls(state: state)
             }
           }

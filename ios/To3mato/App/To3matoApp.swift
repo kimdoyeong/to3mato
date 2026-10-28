@@ -20,7 +20,13 @@ struct To3matoApp: App {
       }
     }
     UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
-    NotificationDelegate.shared.open = { model.runSheetOpen = true }
+    NotificationDelegate.shared.open = { identifier in
+      if let kind = NotificationScheduler.ritualKind(identifier) {
+        model.openRitual(kind)
+      } else {
+        model.runSheetOpen = true
+      }
+    }
   }
 
   var body: some Scene {
@@ -39,7 +45,7 @@ struct To3matoApp: App {
 /// 알림을 누르면 실행 화면(체크인 카드)을 연다. 앱이 앞에 있을 때도 알림을 보여준다.
 final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
   static let shared = NotificationDelegate()
-  var open: @MainActor () -> Void = {}
+  var open: @MainActor (String) -> Void = { _ in }
 
   func userNotificationCenter(
     _ center: UNUserNotificationCenter, willPresent notification: UNNotification
@@ -48,6 +54,7 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @u
   }
 
   func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-    await MainActor.run { open() }
+    let identifier = response.notification.request.identifier
+    await MainActor.run { open(identifier) }
   }
 }

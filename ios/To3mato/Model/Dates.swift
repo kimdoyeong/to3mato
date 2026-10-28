@@ -3,27 +3,23 @@ import To3matoCore
 
 /// Mac의 localDate, offsetDate, dateLabel과 같은 날짜 규칙
 enum Day {
-  static let calendar: Calendar = {
+  /// 계정 시간대(없으면 기기 시간대). 연동 중에는 기기 시간대가 달라도 계정 날짜를 쓴다.
+  static var zone: TimeZone { CalendarTime.zone ?? .current }
+
+  static var calendar: Calendar {
     var calendar = Calendar(identifier: .gregorian)
     calendar.locale = Locale(identifier: "ko_KR")
     calendar.firstWeekday = 2
+    calendar.timeZone = zone
     return calendar
-  }()
-
-  private static let keyFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.dateFormat = "yyyy-MM-dd"
-    return formatter
-  }()
+  }
 
   /// 계정 시간대(없으면 기기 시간대)의 날짜
   static func key(_ date: Date = .now) -> String { CalendarTime.dateInZone(date) }
 
+  /// 그 날짜의 정오(계정 시간대)
   static func date(_ key: String) -> Date {
-    let day = keyFormatter.date(from: key) ?? .now
-    return calendar.date(bySettingHour: 12, minute: 0, second: 0, of: day) ?? day
+    CalendarTime.at(key, hour: 12) ?? .now
   }
 
   static func offset(_ days: Int, from key: String = Day.key()) -> String {
@@ -33,6 +29,7 @@ enum Day {
   static func format(_ date: Date, _ template: String) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "ko_KR")
+    formatter.timeZone = zone
     formatter.setLocalizedDateFormatFromTemplate(template)
     return formatter.string(from: date)
   }
