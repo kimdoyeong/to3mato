@@ -28,3 +28,10 @@ supabase/.branches/
 .wrangler/
 
 /demo/.openai/
+
+# Local agent tooling
+.mcp.json
+.agents/
+.claude/skills/
+.claude/worktrees/
+skills-lock.json

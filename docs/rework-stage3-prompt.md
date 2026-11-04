@@ -4,12 +4,12 @@
 
 ---
 
-To3mato(Electron + Vite + Svelte 5 포모도로·할 일 앱, 저장소 `/Users/doyeongkim/Documents/projects/to3mato`)의 UI/UX 리워크 3단계를 구현한다. 1단계와 2단계는 끝났고, 이 작업은 **계획 시작 카드, 돌아보기 화면, 알림 설정, 템플릿**이다.
+To3mato(Electron + Vite + Svelte 5 포모도로·할 일 앱)의 UI/UX 리워크 3단계를 구현한다. 1단계와 2단계는 끝났고, 이 작업은 **계획 시작 카드, 돌아보기 화면, 알림 설정, 템플릿**이다.
 
 ## 먼저 읽을 것
 
 1. `AGENTS.md` 전체. 특히 카피 규칙(새 문구를 임의로 만들지 않는다, T 톤, 장식 문구 금지, `·` 메타 줄 금지). 아래 "승인된 문구" 밖의 문구가 필요하면 넣지 말고 초안을 사용자에게 먼저 보여준다.
-2. 구현 계획 `/Users/doyeongkim/.claude/plans/inherited-puzzling-allen.md`의 "3단계" 절과 "데이터 모델과 저장소" 절.
+2. 구현 계획 `~/.claude/plans/inherited-puzzling-allen.md`의 "3단계" 절과 "데이터 모델과 저장소" 절.
 3. 디자인 캔버스 https://claude.ai/artifact/4ADqho49kRcxzMkjg6uAWH (Claude Design). Artifact 도구의 read로 `project/canvas.json`과 아트보드 파일을 읽는다. 이번 단계의 기준 아트보드는 `project/Plan.dc.html`(계획 시작 카드), `project/Review.dc.html`(돌아보기), `project/Template.dc.html`(템플릿으로 추가 대화상자), `project/MainTemplate.dc.html`(할 일 탭에서 템플릿 버튼을 눌러 펼친 상태)이다. 캔버스 왼쪽 메모의 "리워크 원칙", "손글씨 부품 여섯 가지", "데이터 모델 변경"도 읽는다.
 4. 코드: `src/lib/domain.mjs`(모든 상태 변경은 `applyCommand`), `src/lib/types.ts`, `src/components/TodoView.svelte`, `QuickAdd.svelte`, `BatchTaskDialog.svelte`, `SettingsView.svelte`, `ExecutionPanel.svelte`, `src/styles/tokens.css`, `components.css`, `app.css`, `electron/main.mjs`, `electron/notifications.mjs`, `electron/preload.cjs`, `tests/rework.test.mjs`, `tests/usability.spec.ts`.
 
