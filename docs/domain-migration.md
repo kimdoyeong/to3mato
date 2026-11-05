@@ -1,7 +1,7 @@
 # To3mato 도메인 전환 계획
 
 작성일: 2026-11-05
-상태: 진행 중. `to3mato.com` 구입 완료(Cloudflare 네임서버 `amy`, `gordon`). 2단계 메일 발송 전환 완료. 1단계 저장소 변경 완료(`SITE_URL`), 대시보드 작업 전. 하위 도메인 이름과 단계별 시점은 "결정할 것"에 답을 받은 뒤 정한다.
+상태: 진행 중. `to3mato.com` 구입 완료(Cloudflare 네임서버 `amy`, `gordon`). 1단계 사이트 전환과 2단계 메일 발송 전환 완료. 하위 도메인 이름과 단계별 시점은 "결정할 것"에 답을 받은 뒤 정한다.
 
 ## 목표
 
@@ -62,6 +62,10 @@
 2. `doyeong.dev` 존에 `to3mato.doyeong.dev/*` → `https://to3mato.com/${path}` 301 규칙을 둔다. 쿼리 문자열을 유지한다.
 
 Pages 프로젝트는 그대로이므로 사이트를 다시 배포할 필요가 없다. 사이트 HTML에는 절대 주소가 없다(`canonical`, `og:url` 없음).
+
+`to3mato.doyeong.dev`에는 프록시를 켠 DNS 레코드가 있어야 규칙이 동작한다. URI 레코드는 브라우저가 읽지 않으므로 리다이렉트에 쓸 수 없다. 2026-11-05 적용: 프록시 레코드 + Single Redirect(`concat("https://to3mato.com", http.request.uri.path)`, 301, 쿼리 유지).
+
+진행 상태 (2026-11-05): `to3mato.com/download`가 200, `to3mato.doyeong.dev`의 `/`, `/about`, `/download?x=1`, `/downloads/release.json`이 같은 경로의 `to3mato.com`으로 301. R2의 0.6.0 `release.json`·`SHA256SUMS.txt`를 `SITE_RELEASE_DIR`로 지정해 `verify-site-release.mjs`가 새 주소에서 통과했다.
 
 저장소 변경 (`release/*`가 아닌 브랜치에서 작업하고 main에 합친다):
 
