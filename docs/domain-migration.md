@@ -96,7 +96,7 @@ Pages 프로젝트는 그대로이므로 사이트를 다시 배포할 필요가
    - Sender email `noreply@to3mato.com`, Sender name `To3mato`
 7. 문의 주소(`hello@doyeong.dev`)를 바꿀지는 "결정할 것" 2번에 따른다. 바꾸면 Cloudflare Email Routing으로 받는 주소를 먼저 만든다.
 
-진행 상태 (2026-11-05): 1~4번과 6번 완료. 첫 시도는 Resend가 `550 This API key is not authorized to send emails from to3mato.com`으로 거부했다. `to3mato.com` 권한이 있는 키로 바꾼 뒤 iCloud로 받은 로그인 메일이 `dkim=pass header.d=to3mato.com`, `spf=pass`(`rsend.to3mato.com`), `dmarc=pass`로 받은편지함에 들어왔다. 5번(`doyeong.dev` 정리)은 남았다.
+진행 상태 (2026-11-05): 1~4번과 6번 완료. 첫 시도는 Resend가 `550 This API key is not authorized to send emails from to3mato.com`으로 거부했다. `to3mato.com` 권한이 있는 키로 바꾼 뒤 iCloud로 받은 로그인 메일이 `dkim=pass header.d=to3mato.com`, `spf=pass`(`rsend.to3mato.com`), `dmarc=pass`로 받은편지함에 들어왔고 링크로 Mac 앱(0.6.0) 로그인까지 확인했다. 5번(`doyeong.dev` 정리)은 남았다.
 
 SMTP 연결 뒤 에이전트 작업:
 
