@@ -65,7 +65,7 @@ node scripts/check-website.mjs
 
 ## Cloudflare 배포
 
-- 웹사이트: `https://to3mato.doyeong.dev`
+- 웹사이트: `https://to3mato.com` (이전 주소 `https://to3mato.doyeong.dev`는 경로를 유지해 301로 연결)
 - Pages 기본 주소: `https://to3mato.pages.dev`
 - Pages 프로젝트: `to3mato` (production branch: `main`)
 - R2 버킷: `to3mato-downloads`

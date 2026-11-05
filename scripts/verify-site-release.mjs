@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { ensureReleaseIsCurrent } from './upload-release.mjs';
-import { DOWNLOAD_URL } from './release-files.mjs';
+import { DOWNLOAD_URL, SITE_URL } from './release-files.mjs';
 
 const directory = process.env.SITE_RELEASE_DIR || 'website/dist/downloads';
 const expected = JSON.parse(
@@ -17,13 +17,10 @@ await ensureReleaseIsCurrent(expected.version);
 for (let attempt = 0; ; attempt++) {
   try {
     const read = async (file) => {
-      const response = await fetch(
-        `https://to3mato.doyeong.dev/${file}?verify=${Date.now()}`,
-        {
-          cache: 'no-store',
-          signal: AbortSignal.timeout(30_000),
-        },
-      );
+      const response = await fetch(`${SITE_URL}${file}?verify=${Date.now()}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(30_000),
+      });
       if (!response.ok) throw new Error(`Site ${file}: ${response.status}`);
       return response.text();
     };

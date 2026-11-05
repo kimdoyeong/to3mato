@@ -6,6 +6,7 @@ import * as yaml from 'js-yaml';
 
 export const FEED_NAME = 'latest-mac.yml';
 export const DOWNLOAD_URL = 'https://downloads.to3mato.doyeong.dev/';
+export const SITE_URL = 'https://to3mato.com/';
 
 export function releaseNames(version) {
   if (!/^\d+\.\d+\.\d+$/.test(version))

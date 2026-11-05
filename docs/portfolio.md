@@ -7,7 +7,7 @@
 
 할 일·캘린더·포모도로 타이머를 하나의 단위(포모도로)로 묶은 macOS 데스크톱 앱. 설계부터 서명·공증·자동 업데이트·CI/CD 배포까지 혼자 완성했고, 실제 배포 중이다.
 
-- 앱 사이트: https://to3mato.doyeong.dev
+- 앱 사이트: https://to3mato.com
 - 현재 배포 버전: 0.3.3 (Apple Silicon, Developer ID 서명·Apple 공증)
 - 스택: Electron 44 · Svelte 5 · Vite 8 · TypeScript · node:sqlite · Playwright · GitHub Actions · Cloudflare R2/Pages
 

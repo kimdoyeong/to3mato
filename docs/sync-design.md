@@ -188,11 +188,13 @@ Auth 설정 (대시보드 또는 `config.toml`)
 | 이메일 OTP    | 길이 6, 유효 10분(`otp_expiry = 600`)                                                         |
 | 가입          | OTP 첫 로그인 때 자동 생성(`shouldCreateUser: true`)                                          |
 | 이메일 확인   | 불필요. OTP 자체가 확인이다                                                                   |
-| SMTP          | Resend. 발신 `noreply@to3mato.doyeong.dev`. 내장 발송은 시간당 몇 통이라 실배포에 쓰지 않는다 |
+| SMTP          | Resend. 발신 `noreply@to3mato.com`. 내장 발송은 시간당 몇 통이라 실배포에 쓰지 않는다        |
 | 발송 제한     | 이메일당 시간당 3회. Auth 기본 제한 설정으로 둔다                                             |
 | JWT 유효 기간 | 1시간(기본). refresh token으로 자동 갱신                                                      |
 | 세션 만료     | 로그아웃 전까지 유지. 비활동 만료는 Pro 전용 설정이라 쓰지 않는다                             |
 | 리전          | 서울(ap-northeast-2)                                                                          |
+
+> 2026-11-05: 발신 주소를 `noreply@to3mato.com`으로 정했다. 원격 SMTP 연결은 [도메인 전환 계획](domain-migration.md)의 2단계를 따른다.
 
 ### Postgres 스키마 (`migrations/0001_sync.sql`)
 
