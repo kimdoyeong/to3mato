@@ -1,7 +1,7 @@
 # To3mato 도메인 전환 계획
 
 작성일: 2026-11-05
-상태: 계획. `to3mato.com` 구입 완료(Cloudflare 네임서버 `amy`, `gordon`). 1단계 저장소 변경 완료(`SITE_URL`), 대시보드 작업 전. 하위 도메인 이름과 단계별 시점은 "결정할 것"에 답을 받은 뒤 정한다.
+상태: 진행 중. `to3mato.com` 구입 완료(Cloudflare 네임서버 `amy`, `gordon`). 2단계 메일 발송 전환 완료. 1단계 저장소 변경 완료(`SITE_URL`), 대시보드 작업 전. 하위 도메인 이름과 단계별 시점은 "결정할 것"에 답을 받은 뒤 정한다.
 
 ## 목표
 
@@ -85,17 +85,18 @@ Pages 프로젝트는 그대로이므로 사이트를 다시 배포할 필요가
 사용자 작업 (Resend, Cloudflare, Supabase 대시보드):
 
 1. Resend Domains에 `to3mato.com`을 추가한다. 리전은 기존 `doyeong.dev`와 같은 `ap-northeast-1`(도쿄)로 한다.
-2. Resend가 알려주는 레코드를 `to3mato.com` 존에 추가한다. Cloudflare 자동 구성을 써도 된다. 보통 다음 세 가지다. 값은 Resend 화면의 것을 그대로 쓴다.
+2. Resend가 알려주는 레코드를 `to3mato.com` 존에 추가한다. 값은 Resend 화면의 것을 그대로 쓴다. Cloudflare 프록시는 끈다(DNS only). 2026-11-05에 넣은 레코드:
    - DKIM: `resend._domainkey` TXT
-   - 반송 경로 SPF: `send` MX와 `send` TXT(`v=spf1 include:amazonses.com ~all`)
-   - Cloudflare 프록시는 끈다(DNS only).
+   - 반송 경로: `send` CNAME → `send.forge.rmta.net`, `rsend` CNAME → `rsend-apne1.forge.rmta.net`. 실제 Return-Path는 `rsend.to3mato.com`이고 그 아래에서 Amazon SES(`ap-northeast-1`)의 MX와 SPF로 이어진다. `doyeong.dev`의 `send` MX·TXT 방식과 형식이 다르다.
 3. `_dmarc` TXT를 `v=DMARC1; p=none;`으로 추가한다. 수신 결과를 본 뒤 `quarantine`으로 올린다.
 4. Resend에서 도메인이 Verified가 되면 `to3mato.com` 전송 전용 API 키를 만든다. 키는 채팅이나 저장소에 남기지 않는다.
-5. 새 발신 주소로 메일이 정상 발송되는 것을 확인한 뒤 Resend의 `doyeong.dev` 도메인을 정리한다. 다른 곳에서 쓰지 않으면 도메인과 `resend._domainkey`, `send` 레코드를 지운다. `doyeong.dev`의 Cloudflare Email Routing(`hello@doyeong.dev` 수신)은 건드리지 않는다.
+5. 새 발신 주소로 메일이 정상 발송되는 것을 확인한 뒤 Resend의 `doyeong.dev` 도메인과 그 도메인 전용 API 키를 정리한다. 다른 곳에서 쓰지 않으면 도메인과 `resend._domainkey`, `send` 레코드를 지운다. `doyeong.dev`의 Cloudflare Email Routing(`hello@doyeong.dev` 수신)은 건드리지 않는다.
 6. Supabase Authentication → SMTP Settings에서 사용자 지정 SMTP를 켠다.
    - Host `smtp.resend.com`, Port `465`, Username `resend`, Password는 4번의 API 키
    - Sender email `noreply@to3mato.com`, Sender name `To3mato`
 7. 문의 주소(`hello@doyeong.dev`)를 바꿀지는 "결정할 것" 2번에 따른다. 바꾸면 Cloudflare Email Routing으로 받는 주소를 먼저 만든다.
+
+진행 상태 (2026-11-05): 1~4번과 6번 완료. 첫 시도는 Resend가 `550 This API key is not authorized to send emails from to3mato.com`으로 거부했다. `to3mato.com` 권한이 있는 키로 바꾼 뒤 iCloud로 받은 로그인 메일이 `dkim=pass header.d=to3mato.com`, `spf=pass`(`rsend.to3mato.com`), `dmarc=pass`로 받은편지함에 들어왔다. 5번(`doyeong.dev` 정리)은 남았다.
 
 SMTP 연결 뒤 에이전트 작업:
 
