@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | `to3mato.doyeong.dev` | 소개·다운로드·약관·개인정보처리방침 사이트 | Pages 프로젝트 `to3mato` |
 | `downloads.to3mato.doyeong.dev` | 설치 파일, `latest-mac.yml`, `release.json` | R2 |
-| `noreply@to3mato.doyeong.dev` | 로그인 메일 발신 (계획) | Resend, `docs/sync-design.md` |
+| `noreply@to3mato.doyeong.dev` | 로그인 메일 발신 (계획). Resend에 도메인을 등록했지만 DNS에 DKIM·SPF 레코드가 없다(2026-11-05 확인) | Resend, `docs/sync-design.md` |
 | `hello@doyeong.dev` | 약관·개인정보처리방침의 문의 주소 | `website/dist/privacy.html`, `website/dist/terms.html` |
 
 로그인 콜백은 도메인을 쓰지 않는다.
@@ -40,7 +40,7 @@
 | --- | --- |
 | `to3mato.com` | 소개·다운로드·약관·개인정보처리방침 사이트. Supabase Site URL. 이후 iOS Universal Link |
 | 공유 하위 도메인 (이름 미정) | 마이크로블로그 공개 페이지. 별도 Pages 프로젝트 또는 Worker |
-| 메일 하위 도메인 (이름 미정) | Resend 발신 도메인 |
+| `noreply@to3mato.com` | 로그인 메일 발신. 발신 도메인은 루트 `to3mato.com` |
 | `to3mato.doyeong.dev` | 경로와 쿼리를 유지한 채 `to3mato.com`으로 301 |
 | `downloads.to3mato.doyeong.dev` | 그대로 유지 |
 
@@ -52,7 +52,7 @@
 
 ## 단계
 
-각 단계는 독립적이다. 1단계와 2단계는 동기화 릴리스 전에 끝낸다.
+각 단계는 독립적이다. 동기화는 0.6.0으로 이미 배포했으므로 로그인 메일에 영향을 주는 2단계를 먼저 진행한다.
 
 ### 1단계: 사이트
 
@@ -80,12 +80,33 @@ Pages 프로젝트는 그대로이므로 사이트를 다시 배포할 필요가
 
 ### 2단계: 메일
 
-1. Resend에 메일 하위 도메인을 발신 도메인으로 등록하고 SPF·DKIM 레코드를 `to3mato.com` 존에 추가한다. 사용자가 한다.
-2. 발신 주소를 `noreply@<메일 하위 도메인>`으로 정한다. `docs/sync-design.md`의 Auth 설정 표를 고친다.
-3. Supabase 원격 Auth의 SMTP 발신 주소를 바꾼다. 원격 설정은 선언한 항목만 별도 작업 폴더에서 push한다.
-4. 문의 주소(`hello@doyeong.dev`)를 바꿀지는 "결정할 것" 3번에 따른다. 바꾸면 Cloudflare Email Routing으로 받는 주소를 먼저 만든다.
+발신 주소는 `noreply@to3mato.com`이다. 발신 도메인은 루트 `to3mato.com`으로 정했다. 메일 평판은 사이트와 같은 도메인에 쌓인다.
 
-발신 도메인을 `to3mato.doyeong.dev`로 이미 등록했다면 새 도메인으로 다시 인증한다. 메일 평판은 도메인별로 쌓이므로 실사용자에게 보내기 전에 옮긴다.
+사용자 작업 (Resend, Cloudflare, Supabase 대시보드):
+
+1. Resend Domains에 `to3mato.com`을 추가한다. 리전은 Supabase 프로젝트와 가까운 곳을 고른다.
+2. Resend가 알려주는 레코드를 `to3mato.com` 존에 추가한다. Cloudflare 자동 구성을 써도 된다. 보통 다음 세 가지다. 값은 Resend 화면의 것을 그대로 쓴다.
+   - DKIM: `resend._domainkey` TXT
+   - 반송 경로 SPF: `send` MX와 `send` TXT(`v=spf1 include:amazonses.com ~all`)
+   - Cloudflare 프록시는 끈다(DNS only).
+3. `_dmarc` TXT를 `v=DMARC1; p=none;`으로 추가한다. 수신 결과를 본 뒤 `quarantine`으로 올린다.
+4. Resend에서 도메인이 Verified가 되면 `to3mato.com` 전송 전용 API 키를 만든다. 키는 채팅이나 저장소에 남기지 않는다.
+5. Resend의 `to3mato.doyeong.dev` 도메인은 DNS 인증 전이므로 삭제한다.
+6. Supabase Authentication → SMTP Settings에서 사용자 지정 SMTP를 켠다.
+   - Host `smtp.resend.com`, Port `465`, Username `resend`, Password는 4번의 API 키
+   - Sender email `noreply@to3mato.com`, Sender name은 승인받은 이름을 쓴다
+7. 문의 주소(`hello@doyeong.dev`)를 바꿀지는 "결정할 것" 3번에 따른다. 바꾸면 Cloudflare Email Routing으로 받는 주소를 먼저 만든다.
+
+SMTP 연결 뒤 에이전트 작업:
+
+- 원격 Auth의 메일 템플릿을 적용한다. 원격 설정은 선언한 항목만 별도 작업 폴더에서 push하고 `n`으로 미리 보기를 먼저 한다.
+- 앱은 로그인 링크(PKCE)로 로그인한다. `supabase/templates/code.html`은 인증 코드만 보여주고 링크가 없다. 그대로 로그인 링크 템플릿에 적용하면 링크로 로그인할 수 없다. 적용 전에 템플릿 내용을 다시 정한다.
+- 원격 OTP 유효 시간은 3600초(2026-10-27 기준)이고 `code.html`의 안내는 10분 기준이다. 둘 중 하나를 맞춘다.
+
+검증:
+
+- `dig TXT resend._domainkey.to3mato.com`, `dig MX send.to3mato.com`, `dig TXT _dmarc.to3mato.com`에 레코드가 보인다.
+- 팀원이 아닌 주소로 Mac과 iPhone에서 로그인 링크를 받아 로그인한다. 받은 메일 헤더의 `dkim=pass`, `spf=pass`, `dmarc=pass`를 확인한다.
 
 ### 3단계: Auth 주소
 
@@ -119,7 +140,7 @@ R2 버킷에 `to3mato.com` 쪽 다운로드 하위 도메인을 하나 더 연�
 ## 결정할 것
 
 1. 공유 페이지 하위 도메인 이름.
-2. 메일 하위 도메인 이름. Resend에 `to3mato.doyeong.dev`를 이미 등록했는가.
+2. Supabase SMTP의 Sender name.
 3. 약관·개인정보처리방침의 문의 주소를 `to3mato.com` 쪽으로 바꾸는가. 바꾸면 페이지 수정은 사이트 재배포가 필요하고 `SITE_RELEASE_DIR`로 현재 공개 버전의 릴리스 폴더를 지정한다.
 4. iOS 로그인을 Universal Link로 바꾸는가, `to3mato://` 스킴을 유지하는가.
 5. 1단계를 동기화 릴리스와 별도로 먼저 진행하는가.
