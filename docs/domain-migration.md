@@ -94,8 +94,8 @@ Pages 프로젝트는 그대로이므로 사이트를 다시 배포할 필요가
 5. 새 발신 주소로 메일이 정상 발송되는 것을 확인한 뒤 Resend의 `doyeong.dev` 도메인을 정리한다. 다른 곳에서 쓰지 않으면 도메인과 `resend._domainkey`, `send` 레코드를 지운다. `doyeong.dev`의 Cloudflare Email Routing(`hello@doyeong.dev` 수신)은 건드리지 않는다.
 6. Supabase Authentication → SMTP Settings에서 사용자 지정 SMTP를 켠다.
    - Host `smtp.resend.com`, Port `465`, Username `resend`, Password는 4번의 API 키
-   - Sender email `noreply@to3mato.com`, Sender name은 승인받은 이름을 쓴다
-7. 문의 주소(`hello@doyeong.dev`)를 바꿀지는 "결정할 것" 3번에 따른다. 바꾸면 Cloudflare Email Routing으로 받는 주소를 먼저 만든다.
+   - Sender email `noreply@to3mato.com`, Sender name `To3mato`
+7. 문의 주소(`hello@doyeong.dev`)를 바꿀지는 "결정할 것" 2번에 따른다. 바꾸면 Cloudflare Email Routing으로 받는 주소를 먼저 만든다.
 
 SMTP 연결 뒤 에이전트 작업:
 
@@ -140,7 +140,6 @@ R2 버킷에 `to3mato.com` 쪽 다운로드 하위 도메인을 하나 더 연�
 ## 결정할 것
 
 1. 공유 페이지 하위 도메인 이름.
-2. Supabase SMTP의 Sender name.
-3. 약관·개인정보처리방침의 문의 주소를 `to3mato.com` 쪽으로 바꾸는가. 바꾸면 페이지 수정은 사이트 재배포가 필요하고 `SITE_RELEASE_DIR`로 현재 공개 버전의 릴리스 폴더를 지정한다.
-4. iOS 로그인을 Universal Link로 바꾸는가, `to3mato://` 스킴을 유지하는가.
-5. 1단계를 동기화 릴리스와 별도로 먼저 진행하는가.
+2. 약관·개인정보처리방침의 문의 주소를 `to3mato.com` 쪽으로 바꾸는가. 바꾸면 페이지 수정은 사이트 재배포가 필요하고 `SITE_RELEASE_DIR`로 현재 공개 버전의 릴리스 폴더를 지정한다.
+3. iOS 로그인을 Universal Link로 바꾸는가, `to3mato://` 스킴을 유지하는가.
+4. 1단계(사이트)를 2단계 뒤 언제 진행하는가.
