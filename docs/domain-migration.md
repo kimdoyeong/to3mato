@@ -1,7 +1,7 @@
 # To3mato 도메인 전환 계획
 
 작성일: 2026-11-05
-상태: 계획. `to3mato.com` 구입 완료(Cloudflare 네임서버 `amy`, `gordon`). 하위 도메인 이름과 단계별 시점은 "결정할 것"에 답을 받은 뒤 정한다.
+상태: 계획. `to3mato.com` 구입 완료(Cloudflare 네임서버 `amy`, `gordon`). 1단계 저장소 변경 완료(`SITE_URL`), 대시보드 작업 전. 하위 도메인 이름과 단계별 시점은 "결정할 것"에 답을 받은 뒤 정한다.
 
 ## 목표
 
@@ -69,11 +69,11 @@ Pages 프로젝트는 그대로이므로 사이트를 다시 배포할 필요가
 
 | 파일 | 변경 |
 | --- | --- |
-| `scripts/verify-site-release.mjs` | 공개 검증 주소를 `https://to3mato.com`으로 |
+| `scripts/release-files.mjs`, `scripts/verify-site-release.mjs` | 공개 검증 주소를 `SITE_URL`(`https://to3mato.com/`) 상수로 |
 | `website/README.md` | 웹사이트 주소 |
 | `docs/portfolio.md` | 앱 사이트 주소 |
 
-`verify-site-release.mjs`는 301 이후 Pages 전파 대기 로직과 함께 동작해야 한다. 바꾼 뒤 다음 릴리스 전에 `deploy=false` 수동 실행으로 확인한다.
+이 변경은 대시보드 작업으로 `to3mato.com`이 열린 뒤에 main에 합친다. 먼저 합치면 다음 릴리스의 공개 페이지 검증이 실패한다. 합치기 전에 `SITE_RELEASE_DIR`로 현재 공개 버전의 릴리스 폴더를 지정해 `node scripts/verify-site-release.mjs`를 실행해 새 주소에서 통과하는지 확인한다.
 
 검증:
 
