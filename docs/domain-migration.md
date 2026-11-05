@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | `to3mato.doyeong.dev` | 소개·다운로드·약관·개인정보처리방침 사이트 | Pages 프로젝트 `to3mato` |
 | `downloads.to3mato.doyeong.dev` | 설치 파일, `latest-mac.yml`, `release.json` | R2 |
-| `noreply@to3mato.doyeong.dev` | 로그인 메일 발신 (계획). Resend에 도메인을 등록했지만 DNS에 DKIM·SPF 레코드가 없다(2026-11-05 확인) | Resend, `docs/sync-design.md` |
+| `doyeong.dev` (메일) | 로그인 메일 발신 도메인. Resend 리전 `ap-northeast-1`. `resend._domainkey` TXT, `send` MX·TXT 있음. DMARC 없음(2026-11-05 확인). Supabase의 실제 발신 주소는 대시보드에서 확인 | Resend, Supabase SMTP |
 | `hello@doyeong.dev` | 약관·개인정보처리방침의 문의 주소 | `website/dist/privacy.html`, `website/dist/terms.html` |
 
 로그인 콜백은 도메인을 쓰지 않는다.
@@ -52,7 +52,7 @@
 
 ## 단계
 
-각 단계는 독립적이다. 동기화는 0.6.0으로 이미 배포했으므로 로그인 메일에 영향을 주는 2단계를 먼저 진행한다.
+각 단계는 독립적이다. 2단계를 먼저 진행한다.
 
 ### 1단계: 사이트
 
@@ -84,14 +84,14 @@ Pages 프로젝트는 그대로이므로 사이트를 다시 배포할 필요가
 
 사용자 작업 (Resend, Cloudflare, Supabase 대시보드):
 
-1. Resend Domains에 `to3mato.com`을 추가한다. 리전은 Supabase 프로젝트와 가까운 곳을 고른다.
+1. Resend Domains에 `to3mato.com`을 추가한다. 리전은 기존 `doyeong.dev`와 같은 `ap-northeast-1`(도쿄)로 한다.
 2. Resend가 알려주는 레코드를 `to3mato.com` 존에 추가한다. Cloudflare 자동 구성을 써도 된다. 보통 다음 세 가지다. 값은 Resend 화면의 것을 그대로 쓴다.
    - DKIM: `resend._domainkey` TXT
    - 반송 경로 SPF: `send` MX와 `send` TXT(`v=spf1 include:amazonses.com ~all`)
    - Cloudflare 프록시는 끈다(DNS only).
 3. `_dmarc` TXT를 `v=DMARC1; p=none;`으로 추가한다. 수신 결과를 본 뒤 `quarantine`으로 올린다.
 4. Resend에서 도메인이 Verified가 되면 `to3mato.com` 전송 전용 API 키를 만든다. 키는 채팅이나 저장소에 남기지 않는다.
-5. Resend의 `to3mato.doyeong.dev` 도메인은 DNS 인증 전이므로 삭제한다.
+5. 새 발신 주소로 메일이 정상 발송되는 것을 확인한 뒤 Resend의 `doyeong.dev` 도메인을 정리한다. 다른 곳에서 쓰지 않으면 도메인과 `resend._domainkey`, `send` 레코드를 지운다. `doyeong.dev`의 Cloudflare Email Routing(`hello@doyeong.dev` 수신)은 건드리지 않는다.
 6. Supabase Authentication → SMTP Settings에서 사용자 지정 SMTP를 켠다.
    - Host `smtp.resend.com`, Port `465`, Username `resend`, Password는 4번의 API 키
    - Sender email `noreply@to3mato.com`, Sender name은 승인받은 이름을 쓴다
