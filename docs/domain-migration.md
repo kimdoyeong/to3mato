@@ -39,7 +39,6 @@
 | 주소 | 용도 |
 | --- | --- |
 | `to3mato.com` | 소개·다운로드·약관·개인정보처리방침 사이트. Supabase Site URL. 이후 iOS Universal Link |
-| `www.to3mato.com` | `to3mato.com`으로 301 |
 | 공유 하위 도메인 (이름 미정) | 마이크로블로그 공개 페이지. 별도 Pages 프로젝트 또는 Worker |
 | 메일 하위 도메인 (이름 미정) | Resend 발신 도메인 |
 | `to3mato.doyeong.dev` | 경로와 쿼리를 유지한 채 `to3mato.com`으로 301 |
@@ -59,9 +58,8 @@
 
 사용자 작업 (Cloudflare 대시보드):
 
-1. Pages 프로젝트 `to3mato`의 Custom domains에 `to3mato.com`과 `www.to3mato.com`을 추가한다.
-2. `to3mato.com` 존에 `www` → 루트 301 규칙을 둔다.
-3. `doyeong.dev` 존에 `to3mato.doyeong.dev/*` → `https://to3mato.com/${path}` 301 규칙을 둔다. 쿼리 문자열을 유지한다.
+1. Pages 프로젝트 `to3mato`의 Custom domains에 `to3mato.com`을 추가한다. `www`는 쓰지 않으므로 레코드를 만들지 않는다.
+2. `doyeong.dev` 존에 `to3mato.doyeong.dev/*` → `https://to3mato.com/${path}` 301 규칙을 둔다. 쿼리 문자열을 유지한다.
 
 Pages 프로젝트는 그대로이므로 사이트를 다시 배포할 필요가 없다. 사이트 HTML에는 절대 주소가 없다(`canonical`, `og:url` 없음).
 
