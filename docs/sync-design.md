@@ -194,6 +194,8 @@ Auth 설정 (대시보드 또는 `config.toml`)
 | 세션 만료     | 로그아웃 전까지 유지. 비활동 만료는 Pro 전용 설정이라 쓰지 않는다                             |
 | 리전          | 서울(ap-northeast-2)                                                                          |
 
+> 2026-11-05: 발신 도메인은 `to3mato.com`의 메일 하위 도메인으로 옮긴다. [도메인 전환 계획](domain-migration.md)의 2단계를 따른다.
+
 ### Postgres 스키마 (`migrations/0001_sync.sql`)
 
 ```sql
