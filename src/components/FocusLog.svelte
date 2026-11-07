@@ -23,6 +23,8 @@
   import { localDate } from '../lib/domain.mjs';
   import { forestItems } from '../lib/forest.mjs';
   import ForestIsland from './ForestIsland.svelte';
+  import ShareProfileCard from './ShareProfileCard.svelte';
+  import { signedIn } from '../lib/share-profile';
   let week = $state(0),
     clips = $state<ClipSummary[]>([]),
     error = $state(''),
@@ -155,6 +157,7 @@
     <h1 id="log-title">집중 로그</h1>
     <p>집중 완료 후 촬영한 3초 영상을 주별로 모읍니다.</p>
   </div>
+  {#if $signedIn}<ShareProfileCard />{/if}
   <section class="delivery-inbox" aria-label="영상 편지함">
     <div class="delivery-schedule">
       <span aria-hidden="true">✉</span>

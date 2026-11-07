@@ -1,0 +1,12 @@
+/* Page shell for me.to3mato.com. Loaded after tokens.css. */
+html {
+  background-color: var(--bg);
+}
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.pp {
+  min-height: 100vh;
+  min-height: 100dvh;
+}

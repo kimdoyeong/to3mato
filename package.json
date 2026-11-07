@@ -1,6 +1,6 @@
 {
   "name": "to3mato",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "To3mato desktop planner",
   "author": "To3mato",
@@ -25,6 +25,8 @@
     "notarize:mac": "node scripts/notarize-mac.mjs",
     "site:prepare": "node scripts/prepare-cloudflare-site.mjs",
     "site:deploy": "npm run site:prepare && npx --yes wrangler@4.151.2 pages deploy website/cloudflare-dist --project-name to3mato --branch main --force",
+    "profile:build": "node scripts/build-profile-worker.mjs",
+    "profile:deploy": "npm run profile:build && npx --yes wrangler@4.151.2 deploy --config workers/profile/wrangler.jsonc",
     "release:verify": "node scripts/upload-release.mjs --dry-run",
     "release:upload": "node scripts/upload-release.mjs"
   },
@@ -39,6 +41,7 @@
       "electron/**/*",
       "src/lib/domain.mjs",
       "src/lib/calendar-time.mjs",
+      "src/lib/public-profile.mjs",
       "src/lib/sync/**/*.mjs",
       "src/styles/tokens.css",
       "package.json"

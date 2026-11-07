@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>To3mato 공개 프로필 시안</title>
+<!--
+  로컬 정적 시안. 네트워크 요청, 클립보드 변경, 실제 데이터가 없다.
+  저장소 안의 토큰과 부품 CSS, 설치된 글꼴을 상대 경로로 읽는다. docs/design/ 위치에서 연다.
+  시안 조작 막대와 번호 주석은 검토용이며 제품 화면에 포함하지 않는다.
+-->
+<link rel="stylesheet" href="../../node_modules/@fontsource/poor-story/index.css">
+<link rel="stylesheet" href="../../node_modules/@fontsource/gamja-flower/index.css">
+<link rel="stylesheet" href="../../src/styles/tokens.css">
+<link rel="stylesheet" href="../../src/styles/components.css">
+<style>
+  @font-face {
+    font-family: 'Poor Story Digits';
+    src: url('../../public/fonts/poor-story-digits.woff2') format('woff2');
+    unicode-range: U+30-39;
+  }
+
+  /* ═══════════ 검토용 틀 (제품 화면 아님) ═══════════ */
+  :root {
+    --review-ink: #2f3a4a;
+    --review-line: #c8d0dc;
+    --review-bg: #f4f6f9;
+    --review-note: #3d6fb6;
+    --review-font: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+  body { min-height: 100vh; }
+  .review-bar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+    padding: 10px 20px;
+    background: var(--review-bg); border-bottom: 1px solid var(--review-line);
+    font: 13px/1.4 var(--review-font); color: var(--review-ink);
+  }
+  .review-bar strong { font-size: 14px; margin-right: 6px; }
+  .review-group { display: inline-flex; align-items: center; gap: 6px; }
+  .review-group > span { color: #6b7686; }
+  .rv-seg { display: inline-flex; border: 1px solid var(--review-line); border-radius: 8px; overflow: hidden; background: #fff; }
+  .rv-seg button { font: inherit; padding: 6px 12px; color: var(--review-ink); border-radius: 0; }
+  .rv-seg button + button { border-left: 1px solid var(--review-line); }
+  .rv-seg button[aria-pressed="true"] { background: var(--review-ink); color: #fff; }
+  .review-bar label { font: 13px/1.4 var(--review-font); color: var(--review-ink); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+
+  .stage { padding: 28px 20px 60px; max-width: 1640px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .frame-label { font: 12px/1.4 var(--review-font); color: #6b7686; margin: 0 0 8px 4px; }
+
+  /* 번호 주석 */
+  .anno {
+    display: inline-grid; place-items: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--review-note); color: #fff;
+    font: 600 11px/1 var(--review-font); font-style: normal;
+    vertical-align: middle; margin: 0 4px; flex-shrink: 0;
+    box-shadow: 0 0 0 2px #fff;
+  }
+  body:not(.show-anno) .anno, body:not(.show-anno) .notes { display: none; }
+  .notes {
+    flex: 1 1 280px; max-width: 420px;
+    font: 13px/1.6 var(--review-font); color: var(--review-ink);
+    background: #fff; border: 1px solid var(--review-line); border-radius: 10px; padding: 14px 18px;
+  }
+  .notes h2 { font: 600 14px/1.4 var(--review-font); letter-spacing: 0; margin: 0 0 8px; }
+  .notes ol { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 8px; }
+  .notes li { display: flex; gap: 6px; }
+  .notes li .anno { margin: 1px 4px 0 0; }
+
+  /* 기기 틀 */
+  .browser { flex: 1 1 820px; min-width: 0; }
+  .browser-box { border: 1px solid var(--review-line); border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 10px 30px #2f3a4a1f; }
+  .browser-top { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: #eceff3; border-bottom: 1px solid var(--review-line); }
+  .browser-top i { width: 11px; height: 11px; border-radius: 50%; background: #cfd5de; }
+  .addr { margin-left: 14px; flex: 1; max-width: 420px; height: 24px; border-radius: 6px; background: #fff; border: 1px dashed #b5bfcc; font: 12px/22px var(--review-font); color: #8a95a5; padding: 0 10px; }
+  .browser-screen { height: 780px; overflow-y: auto; background: var(--bg); }
+
+  .phone { flex: 0 0 auto; }
+  .phone-box { width: 390px; height: 820px; border: 11px solid #2b2420; border-radius: 52px; overflow: hidden; background: #fff; display: flex; flex-direction: column; box-shadow: 0 14px 36px #2f3a4a33; }
+  .phone-status { height: 44px; flex-shrink: 0; background: #fff; }
+  .inapp-bar { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; flex-shrink: 0; background: #fff; border-bottom: 1px solid #e5e8ec; font: 12px var(--review-font); color: #8a95a5; }
+  .inapp-bar .addr { margin: 0; height: 26px; line-height: 24px; text-align: center; }
+  .inapp-bar b { font-size: 18px; font-weight: 400; color: #444; }
+  .phone-screen { flex: 1; overflow-y: auto; background: var(--bg); }
+
+  /* ═══════════ 공개 프로필 ═══════════ */
+  .pp { container-type: inline-size; position: relative; min-height: 100%; background-color: var(--bg); background-image: radial-gradient(var(--bg-dots) 1.3px, transparent 1.5px); background-size: 26px 26px; }
+  .pp-cover { position: relative; height: 240px; overflow: hidden; background: #3b2a22; }
+  .pp-video, .pp-video .scene { position: absolute; inset: 0; }
+  .pp-video .scene { opacity: 0; transition: opacity 0.8s; background-size: 140% 140%; animation: drift 9s ease-in-out infinite alternate; }
+  .pp-video .scene.on { opacity: 1; }
+  .pp.paused .pp-video .scene { animation-play-state: paused; }
+  .scene.s1 { background-image: radial-gradient(circle at 28% 42%, #f4b69d 0, transparent 38%), radial-gradient(circle at 72% 70%, #ef5b43aa 0, transparent 30%), linear-gradient(160deg, #6b4a3a, #2e1c15); }
+  .scene.s2 { background-image: radial-gradient(circle at 64% 38%, #c9e3b3 0, transparent 36%), radial-gradient(circle at 24% 78%, #69a84f99 0, transparent 34%), linear-gradient(200deg, #4f5a3a, #26261b); }
+  .scene.s3 { background-image: radial-gradient(circle at 46% 30%, #fff0c7 0, transparent 30%), radial-gradient(circle at 80% 76%, #f6dc92aa 0, transparent 34%), linear-gradient(170deg, #7a6240, #2e2216); }
+  .scene.s4 { background-image: radial-gradient(circle at 36% 56%, #e9d8c6 0, transparent 40%), radial-gradient(circle at 76% 30%, #f08b72aa 0, transparent 28%), linear-gradient(140deg, #8a6c55, #3b2a22); }
+  @keyframes drift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+  /* 그라데이션 6종. 기존 색 토큰만 쓴다. 공개 프로필 ID 해시로 하나를 고른다 */
+  .g0 { background: linear-gradient(165deg, var(--peach) 0%, var(--peach-deep) 38%, var(--tomato-half) 72%, var(--coral) 100%); }
+  .g1 { background: linear-gradient(165deg, var(--butter) 0%, var(--butter-deep) 55%, var(--highlight) 100%); }
+  .g2 { background: linear-gradient(165deg, var(--green-light) 0%, var(--tape-green) 40%, var(--leaf-light) 72%, var(--leaf) 100%); }
+  .g3 { background: linear-gradient(165deg, var(--peach-current) 0%, var(--peach) 40%, var(--peach-deep) 72%, var(--coral-light) 100%); }
+  .g4 { background: linear-gradient(165deg, var(--done) 0%, var(--kraft) 55%, var(--kraft-deep) 100%); }
+  .g5 { background: linear-gradient(165deg, var(--peach) 0%, var(--coral-light) 40%, var(--coral) 75%, var(--tomato-light) 100%); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+  .swatches span { width: 34px; height: 22px; border-radius: 6px; border: 1px solid var(--review-line); position: relative; }
+  .swatches span.on { outline: 2px solid var(--review-note); outline-offset: 2px; }
+  .pp-cover::after { content: ''; position: absolute; inset: auto 0 0 0; height: 90px; background: linear-gradient(transparent, #fff3e3e6); pointer-events: none; }
+  .pp-cover .icon-button { position: absolute; top: 14px; right: 14px; z-index: 1; width: 38px; height: 38px; background: color-mix(in srgb, var(--paper) 82%, transparent); color: var(--ink); }
+  .pp-cover .anno-pos { position: absolute; top: 20px; left: 16px; z-index: 1; }
+
+  .pp-body { display: grid; gap: 18px; padding: 28px 16px 44px; max-width: 1080px; margin: 0 auto; }
+  .pp .pp-body.over-cover { margin-top: -64px; position: relative; }
+  .pp-side, .pp-main { display: grid; gap: 18px; min-width: 0; align-content: start; }
+  .pp .paper { padding: 20px 20px 22px; }
+  .pp h2 { font-size: var(--text-xl); margin: 0 0 14px; }
+
+  .pp-head { display: flex; align-items: center; gap: 4px; padding: 22px 22px 20px; }
+  .pp-head h1 { font-size: var(--text-h2-lg); margin: 0; line-height: 1.2; overflow-wrap: anywhere; }
+
+  .pp-today h2 { font-family: var(--font-body); font-size: var(--text-md); color: var(--muted); letter-spacing: 0; margin: 0; }
+  .pp-count { display: flex; align-items: baseline; gap: 10px; margin: 2px 0 10px; }
+  .pp-count .big { font-family: var(--font-display); font-size: 68px; line-height: 1; color: var(--red); letter-spacing: -0.03em; }
+  .pp-today .tomatoes { flex-wrap: wrap; gap: 4px; }
+  .pp-today .mini-tomato { width: 24px; height: 24px; }
+  .pp-stat { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-top: 2px dashed var(--peach-deep); margin: 16px 0 0; padding-top: 12px; font-size: var(--text-md); }
+  .pp-stat dt { color: var(--muted); }
+  .pp-stat dd { margin: 0; font-family: var(--font-num); font-size: var(--text-xl); }
+
+  .grass { display: grid; grid-template-columns: 18px repeat(20, minmax(0, 1fr)); grid-template-rows: 16px repeat(7, auto); gap: 3px; max-width: 600px; }
+  .grass .m { grid-row: 1; font-size: 12px; color: var(--muted); white-space: nowrap; line-height: 16px; }
+  .grass .w { grid-column: 1; font-size: 11px; color: var(--muted); line-height: 1; align-self: center; }
+  .grass .c { aspect-ratio: 1; border-radius: 24% 30% 24% 30% / 30% 24% 30% 24%; background: var(--paper-soft); box-shadow: inset 0 0 0 1.5px var(--line); }
+  .grass .c.l1 { background: var(--peach-deep); box-shadow: none; }
+  .grass .c.l2 { background: var(--tomato-half); box-shadow: none; }
+  .grass .c.l3 { background: var(--tomato); box-shadow: none; }
+  .grass .c.l4 { background: var(--red-deep); box-shadow: none; }
+  .grass .c.today { outline: 2.5px solid var(--highlight); outline-offset: 1px; }
+  .grass .c.future { visibility: hidden; }
+  .grass-legend { display: flex; justify-content: flex-end; align-items: center; gap: 3px; margin-top: 12px; max-width: 600px; }
+  .grass-legend .c { width: 12px; aspect-ratio: 1; }
+
+  .pp-projects ul { list-style: none; margin: 0; padding: 0; }
+  .pp-projects li { display: flex; align-items: center; gap: 4px; padding: 10px 0; border-top: 2px dashed var(--line); font-size: var(--text-md); }
+  .pp-projects li:first-child { border-top: 0; padding-top: 0; }
+  .pp-projects .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .pp-projects .cnt { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-num); color: var(--muted); }
+  .pp-projects .mini-tomato { width: 18px; height: 18px; }
+
+  .pp-tickets { display: grid; gap: 16px; }
+  .pp .ticket { min-height: 104px; }
+  .pp .ticket-body { cursor: default; flex: 1; min-width: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+  .pp .ticket-title { font-size: 18px; overflow-wrap: anywhere; }
+  .pp .ticket-meta { display: flex; gap: 10px; align-items: center; font-size: 13px; flex-wrap: wrap; }
+  .pp .ticket-note { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  .pp .ticket .stub { width: 78px; }
+  .pp .ticket .notch { left: 68px; }
+  .pp .ticket .stub .mini-tomato { width: 14px; height: 14px; }
+  .pp .ticket .stub .tomatoes { gap: 2px; flex-wrap: wrap; justify-content: center; }
+  .pp .ticket .stub .num { font-size: 13px; }
+  .tilt-big-a { rotate: -1.2deg; }
+  .tilt-big-b { rotate: 0.9deg; }
+  .pp .datestamp { width: 50px; height: 50px; font-size: 11px; margin-right: 12px; }
+
+  @container (min-width: 760px) {
+    .pp-cover { height: 320px; }
+    .pp-body { grid-template-columns: 300px minmax(0, 1fr); padding: 36px 40px 64px; gap: 24px; align-items: start; }
+    .pp .pp-body.over-cover { margin-top: -90px; }
+    .pp-side { position: sticky; top: 24px; gap: 22px; }
+    .pp-main { gap: 22px; }
+    .pp .paper { padding: 24px 26px 26px; }
+    .pp-head h1 { font-size: var(--text-h1); }
+    .pp-head .avatar { width: 72px; height: 72px; margin-right: 14px; }
+    .pp-count .big { font-size: 84px; }
+    .grass { gap: 4px; }
+    .pp .ticket .stub { width: 96px; }
+    .pp .ticket .notch { left: 86px; }
+    .pp .datestamp { width: 62px; height: 62px; font-size: 12px; margin-right: 16px; }
+  }
+
+  /* ═══════════ 앱 시안 (집중 로그, 공유 메뉴) ═══════════ */
+  .mock-app {
+    position: relative; flex: 1 1 900px; min-width: 0;
+    display: grid; grid-template-columns: 96px minmax(0, 1fr) 340px;
+    height: 820px; overflow: hidden;
+    border: 1px solid var(--review-line); border-radius: 12px;
+    background: var(--bg); box-shadow: 0 10px 30px #2f3a4a1f;
+  }
+  .mock-app .tabs { position: static; min-height: 0; max-height: none; }
+  .mock-app .tab { cursor: default; }
+  .mock-app .workspace { overflow-y: auto; position: relative; }
+  .mock-app .execution { position: static; height: auto; overflow: hidden; align-self: stretch; }
+  .dim { opacity: 0.4; pointer-events: none; }
+  .date-label { font-size: 15px; color: var(--muted); background: var(--paper); border: 2px solid var(--line); border-radius: var(--wobble-s); padding: 4px 14px; rotate: 1.2deg; }
+
+  .share-wrap { position: relative; }
+  .share-btn .icon { width: 17px; height: 17px; }
+  .share-menu {
+    position: absolute; top: calc(100% + 10px); right: 0; z-index: 4;
+    min-width: 210px; padding: 8px;
+    background: var(--paper); border: 2px solid var(--line-strong);
+    border-radius: var(--wobble-a); box-shadow: 0 4px 0 var(--line-strong), 0 14px 30px #4a312826;
+  }
+  .share-menu[hidden] { display: none; }
+  .share-menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--wobble-s); font-size: var(--text-md); text-align: left; white-space: nowrap; }
+  .share-menu button:hover, .share-menu button:focus-visible { background: var(--peach); color: var(--red-deep); }
+  .mock-app .toast { position: absolute; }
+
+  .name-layer { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; background: #4a312850; backdrop-filter: blur(4px); }
+  .name-layer[hidden] { display: none; }
+  .name-layer dialog { position: static; margin: 0; }
+  .name-layer label { display: grid; gap: 8px; }
+  .name-layer dialog.wide { width: 880px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); overflow-y: auto; padding: 26px 30px; }
+  .first-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 28px; }
+  .first-grid > div { min-width: 0; }
+  dialog:not(.wide) .first-only { display: none; }
+  dialog:not(.wide) .first-grid { display: block; }
+  .field-title { font-family: var(--font-body); font-size: var(--text-base); letter-spacing: 0; margin: 18px 0 8px; display: flex; align-items: center; }
+  .photo-field { display: flex; align-items: center; gap: 14px; }
+  .photo-field .avatar { width: 52px; height: 52px; margin: 0; }
+  .avatar-empty { width: 52px; height: 52px; border-radius: 50%; border: 2px dashed var(--line-strong); background: var(--paper-soft); flex-shrink: 0; }
+  .first-grid .share-list { margin-top: 0; }
+  .first-grid .share-row { min-height: 42px; font-size: var(--text-base); }
+  .mini-screen { height: 500px; overflow-y: auto; border: 2px solid var(--line); border-radius: 22px; background: var(--bg); }
+  .avatar {
+    display: inline-block; width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0; margin-right: 10px;
+    background: radial-gradient(circle at 50% 36%, var(--peach) 0 17%, transparent 18%), radial-gradient(circle at 50% 108%, var(--coral) 0 40%, transparent 41%), linear-gradient(135deg, var(--kraft), var(--kraft-deep));
+    border: 3px solid #fff; box-shadow: 0 2px 0 var(--line-strong);
+  }
+  .avatar.sm { width: 28px; height: 28px; border-width: 2px; margin: 0; box-shadow: none; }
+  .name-count { font-size: var(--text-xs); color: var(--ink-hint); text-align: right; margin-top: 6px; font-family: var(--font-num); }
+  .form-error { color: var(--red-deep); font-size: var(--text-sm); margin: 10px 0 0; }
+  .share-row .name-val { display: flex; align-items: center; gap: 12px; color: var(--muted); }
+  .log-intro { margin: 8px 0 24px; }
+  .log-intro h1 { font-size: 30px; font-weight: 400; margin: 12px 0 8px; }
+  .log-intro p { color: var(--muted); font-size: 16px; line-height: 1.6; }
+
+  .share-card { margin: 0 0 30px; }
+  .share-card h2 { display: flex; align-items: center; }
+  .share-list { list-style: none; margin: 14px 0 0; padding: 0; }
+  .share-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 48px; padding: 6px 0; font-size: var(--text-md); border-top: 2px dashed var(--line); }
+  .share-row:first-child { border-top: 0; }
+  .share-row.fixed + .share-row:not(.fixed) { border-top: 2px solid var(--line); margin-top: 6px; padding-top: 12px; }
+  .share-row .lbl { display: flex; align-items: center; min-width: 0; }
+  .share-row .lock { color: var(--ink-hint); width: 20px; height: 20px; margin-right: 13px; }
+  .share-row.sub { padding-left: 22px; position: relative; }
+  .share-row.sub::before { content: ''; position: absolute; left: 6px; top: 6px; width: 10px; height: 20px; border-left: 2px solid var(--line-strong); border-bottom: 2px solid var(--line-strong); border-radius: 0 0 0 8px; }
+
+  /* 스위치: 손그림 알약 + 토마토 손잡이 */
+  .sw {
+    position: relative; flex-shrink: 0;
+    width: 50px; height: 28px; padding: 0;
+    border: 2px solid var(--line-strong); border-radius: 15px 17px 14px 16px / 16px 14px 17px 15px;
+    background: #fff;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .sw::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: var(--blob);
+    background: var(--stroke-soft);
+    transition: transform 0.18s;
+  }
+  .sw[aria-checked="true"] { background: var(--tomato); border-color: var(--red); }
+  .sw[aria-checked="true"]::after { transform: translateX(22px); background: #fff; }
+  .sw:disabled { opacity: 0.4; }
+
+  .timer-ghost { height: 360px; border-radius: var(--wobble-l); background: var(--peach-panel); border: 2px solid var(--peach-deep); box-shadow: 0 6px 0 var(--peach-deep); }
+  .list-ghost { margin-top: 30px; display: grid; gap: 12px; }
+  .list-ghost i { display: block; height: 62px; border-radius: var(--wobble-row); background: var(--paper); border: 2px solid var(--line); }
+  .ghost-block { height: 120px; border-radius: 12px; border: 1px dashed #d6c5ab; margin-bottom: 20px; }
+  .ghost-line { height: 44px; border-block: 1px solid var(--line); margin-bottom: 20px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pp-video .scene { animation: none; transition: none; }
+    .sw, .sw::after { transition: none; }
+  }
+</style>
+</head>
+<body class="show-anno">
+
+<div class="review-bar" role="toolbar" aria-label="시안 조작">
+  <strong>마이크로블로그 시안</strong>
+  <div class="review-group">
+    <span>화면</span>
+    <div class="rv-seg" data-group="view">
+      <button aria-pressed="true" data-v="profile">공개 프로필</button>
+      <button aria-pressed="false" data-v="settings">공개 범위 설정</button>
+      <button aria-pressed="false" data-v="share">공유 메뉴</button>
+    </div>
+  </div>
+  <div class="review-group">
+    <span>사용자</span>
+    <div class="rv-seg" data-group="user">
+      <button aria-pressed="true" data-u="kim">김토마토 씨 (모두 ON)</button>
+      <button aria-pressed="false" data-u="lee">이부끄 씨 (모두 OFF)</button>
+    </div>
+  </div>
+  <label><input type="checkbox" id="annoToggle" checked> 검토 주석</label>
+  <label><input type="checkbox" id="motionToggle"> 움직임 줄이기 흉내</label>
+</div>
+
+<main class="stage">
+
+  <!-- ───────── 1. 공개 프로필 ───────── -->
+  <section class="view active" id="view-profile" aria-label="공개 프로필 시안">
+    <div class="row">
+      <div class="browser">
+        <p class="frame-label">데스크톱 1280px 전후</p>
+        <div class="browser-box">
+          <div class="browser-top"><i></i><i></i><i></i><span class="addr">공개 프로필 주소 (하위 도메인 미정)</span></div>
+          <div class="browser-screen" data-profile="desktop"></div>
+        </div>
+      </div>
+      <div class="phone">
+        <p class="frame-label">모바일 390px · 인스타그램 프로필 링크에서 연 인앱 브라우저</p>
+        <div class="phone-box">
+          <div class="phone-status"></div>
+          <div class="inapp-bar"><b>✕</b><span class="addr">주소 미정</span><b>⋯</b></div>
+          <div class="phone-screen" data-profile="phone"></div>
+        </div>
+      </div>
+      <aside class="notes" aria-label="공개 프로필 검토 메모">
+        <h2>공개 프로필 검토 메모</h2>
+        <ol>
+          <li><i class="anno">1</i><span>상단 배경. 모든 사용자에게 있다. 주간 영상 ON이면 영상(시안은 색 면 4개를 3초마다 교체), OFF이거나 새 영상이 없는 주에는 단색 그라데이션이다. 그라데이션은 아래 6종 중 공개 프로필 ID의 해시로 하나를 고른다(파란 테두리가 현재 사용자). 시안 ID는 김토마토 씨 <code>pf_8c2e1a</code>, 이부끄 씨 <code>pf_3b7d90</code>.<span class="swatches" id="swatches" style="display:flex"></span> 그라데이션 배경에는 정지 버튼이 없다. 일시 정지 버튼과 움직임 줄이기 대응은 제안이다.</span></li>
+          <li><i class="anno">2</i><span>표시 이름과 사진. 첫 공유 때 입력한 값이다. 사진은 선택이라 김토마토 씨는 사진 있음, 이부끄 씨는 사진 없음으로 둔다. 사진은 색 면으로 대신한다.</span></li>
+          <li><i class="anno">3</i><span>공통 정보. 오늘 완료한 포모도로 수. 숫자와 토마토 도장을 함께 쓴다.</span></li>
+          <li><i class="anno">4</i><span>공통 정보. 잔디. 최근 20주, 월요일 시작, 완료 포모도로 수 5단계는 디자인 가정이다. 오늘 칸은 형광펜 테두리로 표시한다.</span></li>
+          <li><i class="anno">5</i><span>선택 공개 후보 예시: 집중 시간, 프로젝트, 완료한 할 일, 티켓 메모. 항목 이름과 목록은 확정이 아니다.</span></li>
+        </ol>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ───────── 2. 공개 범위 설정 ───────── -->
+  <section class="view" id="view-settings" aria-label="공개 범위 설정 시안">
+    <div class="row">
+      <div style="flex:1 1 900px;min-width:0">
+        <p class="frame-label">Mac 앱 · 집중 로그 탭</p>
+        <div class="mock-app" data-app="settings"></div>
+      </div>
+      <div class="phone">
+        <p class="frame-label">설정 결과 미리보기 (모바일 공개 프로필)</p>
+        <div class="phone-box">
+          <div class="phone-status"></div>
+          <div class="inapp-bar"><b>✕</b><span class="addr">주소 미정</span><b>⋯</b></div>
+          <div class="phone-screen" data-profile="settings-phone"></div>
+        </div>
+      </div>
+      <aside class="notes" aria-label="공개 범위 설정 검토 메모">
+        <h2>공개 범위 설정 검토 메모</h2>
+        <ol>
+          <li><i class="anno">1</i><span>섹션 제목 <code>공유 프로필</code>은 사용자 가칭이다. 최종 이름은 미정.</span></li>
+          <li><i class="anno">2</i><span>항상 공개되는 공통 정보. 스위치 대신 자물쇠로 표시해 끌 수 없음을 보여준다.</span></li>
+          <li><i class="anno">3</i><span>주간 영상. 공개 여부를 사용자가 선택하는 항목으로 확정됐다. 주차 선택 UI는 두지 않는다.</span></li>
+          <li><i class="anno">4</i><span>검토 중인 후보 항목. 이름, 목록, 순서, 초기값은 미정이다. 시안의 ON/OFF는 두 사용자의 상태를 구별하기 위한 값이다.</span></li>
+          <li><i class="anno">5</i><span>티켓 메모는 완료한 할 일에 딸린 정보로 가정해 들여 쓴다. 완료한 할 일이 OFF면 비활성화된다. 제안.</span></li>
+          <li><i class="anno">6</i><span>표시 이름과 사진. 첫 공유 때 입력한 값을 보여주고 <code>수정</code>으로 바꾼다. 수정 대화상자에서도 사진을 추가하거나 삭제한다. 이 화면은 첫 공유를 마친 상태다. 첫 공유 전에는 값 자리에 <code>없음</code>을 두고 <code>수정</code> 버튼을 숨기는 것을 제안한다. 이 행의 위치도 제안이다.</span></li>
+        </ol>
+        <p>스위치를 직접 눌러 오른쪽 미리보기와 공개 프로필 화면에 반영되는지 확인할 수 있다.</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ───────── 3. 공유 메뉴 ───────── -->
+  <section class="view" id="view-share" aria-label="공유 메뉴 시안">
+    <div class="row">
+      <div style="flex:1 1 900px;min-width:0">
+        <p class="frame-label">Mac 앱 · 작업 영역 상단</p>
+        <div class="mock-app" data-app="share"></div>
+      </div>
+      <aside class="notes" aria-label="공유 메뉴 검토 메모">
+        <h2>공유 메뉴 검토 메모</h2>
+        <ol>
+          <li><i class="anno">1</i><span><code>공유하기</code>. 작업 영역 상단 날짜 왼쪽에 둔다. 모든 탭에서 같은 위치다.</span></li>
+          <li><i class="anno">2</i><span><code>프로필 공유하기</code>. 누르면 메뉴가 닫히고 링크가 복사된다. 시안에서는 실제 클립보드를 바꾸지 않는다.</span></li>
+          <li><i class="anno">3</i><span>복사 결과 알림. 기존 알림 부품을 쓴다. 실패 시에는 <code>링크를 복사하지 못했습니다. 다시 시도하세요.</code>를 같은 위치에 보여준다.</span></li>
+          <li><i class="anno">4</i><span>첫 공유 때만 표시 이름을 입력받는다. 최대 20자, 다른 사용자와 같은 이름 허용(사용자 결정). 제목은 사용자가 정한 <code>프로필 공유하기</code>를 그대로 쓴다.</span></li>
+          <li><i class="anno">5</i><span><code>저장</code>을 누르면 이름, 사진, 공개 범위를 저장하고 링크를 복사한 뒤 알림을 보여준다. 닫기나 Esc는 공유하지 않고 닫는다. 빈 이름이면 기존 오류 형식으로 안내한다.</span></li>
+          <li><i class="anno">6</i><span>사진은 선택이다. JPEG, PNG, HEIC, WebP, 10MB 이하. 가운데 정사각형으로 자동으로 잘라 원형으로 보여준다. 시안은 실제 사진 대신 색 면으로 표시하고 파일 선택 창을 열지 않는다.</span></li>
+          <li><i class="anno">7</i><span>공개 범위. 집중 로그 탭의 공유 프로필 카드와 같은 항목과 값이다. 여기서 바꾸면 카드에도 반영되고, 닫기나 Esc로 공유를 취소하면 대화상자를 열기 전 값으로 되돌린다.</span></li>
+          <li><i class="anno">8</i><span>미리보기. 입력한 이름, 사진, 공개 범위를 모바일 공개 프로필 배치로 바로 보여준다.</span></li>
+        </ol>
+        <p>지금은 두 사용자 모두 첫 공유 전 상태다. <code>프로필 공유하기</code>를 누르면 첫 공유 대화상자가 열리고, 저장한 뒤에는 바로 링크가 복사된다. 공개 중지 위치와 iPhone 배치는 미정이라 표시하지 않았다.</p>
+        <p><button type="button" data-reset style="font:inherit;color:var(--review-note);text-decoration:underline;padding:0">첫 공유 전 상태로 되돌리기</button></p>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const TODAY = new Date(2026, 10, 8); // 2026-11-08 (일)
+  const WEEKS = 20;
+
+  const ICON = {
+    todo: '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="m8 9 1 1 2-2m3 1h3m-9 6 1 1 2-2m3 1h3"/>',
+    folder: '<path d="M3 7V5a2 2 0 0 1 2-2h5l3 3h6a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h1m6 0h1"/>',
+    camera: '<rect x="3" y="6" width="18" height="15" rx="3"/><path d="m8 6 2-3h4l2 3"/><circle cx="12" cy="13" r="4"/>',
+    settings: '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    pause: '<path d="M8 5v14m8-14v14" stroke-width="3"/>',
+    play: '<path d="m8 5 11 7-11 7Z" fill="currentColor" stroke="none"/>',
+    share: '<path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>',
+    link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  };
+  const icon = (n, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+  const tomato = (filled = true) => `<svg class="mini-tomato tomato ${filled ? 'filled' : ''}" viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M12 7C7 4.5 2 8 2.5 13.5 3 18.5 7 22 12 22s9-3.5 9.5-8.5C22 8 17 4.5 12 7Z"/><path class="calyx" d="m12 8.5-4.4-.4 2-2-2.8-1.2 3-.4.4-2.2L12 4l1.8-1.7.4 2.2 3 .4-2.8 1.2 2 2Z"/></svg>`;
+  const anno = (n) => `<i class="anno" aria-hidden="true">${n}</i>`;
+
+  // 예시 데이터. 실제 사용자와 기록이 아니다.
+  const USERS = {
+    kim: {
+      name: '김토마토', profileId: 'pf_8c2e1a', today: 5, focus: '2시간 5분', seed: 7, rate: 0.82, max: 9,
+      projects: [
+        { name: '포트폴리오 사이트', color: '#e58a6b', count: 14 },
+        { name: '영어 회화', color: '#7fae6a', count: 9 },
+        { name: '디자인 책 읽기', color: '#c9a04a', count: 6 },
+      ],
+      tickets: [
+        { title: '랜딩 시안 정리', project: 0, used: 2, estimate: 2, time: '오후 4:10', note: '히어로 영역 두 가지 버전 비교' },
+        { title: '회화 표현 20개 외우기', project: 1, used: 1, estimate: 1, time: '오후 1:35', note: '' },
+        { title: '3장 읽고 메모하기', project: 2, used: 2, estimate: 3, time: '오전 10:50', note: '타이포 위계 부분 다시 보기' },
+      ],
+      all: true,
+    },
+    lee: {
+      name: '이부끄', profileId: 'pf_3b7d90', today: 2, focus: '50분', seed: 3, rate: 0.42, max: 4,
+      projects: [{ name: '자격증 공부', color: '#7fae6a', count: 4 }],
+      tickets: [{ title: '기출 문제 1회 풀기', project: 0, used: 2, estimate: 2, time: '오후 3:20', note: '오답 정리 남음' }],
+      all: false,
+    },
+  };
+  const OPTIONS = ['video', 'focus', 'projects', 'tasks', 'memo'];
+  let user = 'kim';
+  const shared = { kim: false, lee: false }; // 첫 공유 전에는 표시 이름이 없다
+  const names = { kim: '김토마토', lee: '이부끄' };
+  const photos = { kim: true, lee: false }; // 사진은 선택. 시안의 사진은 색 면으로 대신한다
+  let draft = { name: '', photo: false };
+  let shareMenuOpen = true; // 시안 첫 화면에서만 공유 메뉴를 펼쳐 둔다
+  let rangeSnapshot = null; // 첫 공유를 취소하면 공개 범위를 이 값으로 되돌린다
+  let opts = {};
+  const setPreset = () => { OPTIONS.forEach((k) => (opts[k] = USERS[user].all)); };
+  setPreset();
+
+  // 공개 프로필 ID → 그라데이션 번호. FNV-1a 32비트. 이름, 이메일, 계정 ID는 쓰지 않는다
+  const GRADIENTS = 6;
+  function gradientIndex(id) {
+    let h = 0x811c9dc5;
+    for (const ch of id) { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h % GRADIENTS;
+  }
+  function renderSwatches() {
+    const el = document.getElementById('swatches'); if (!el) return;
+    const cur = opts.video ? -1 : gradientIndex(USERS[user].profileId);
+    el.innerHTML = Array.from({ length: GRADIENTS }, (_, i) => `<span class="g${i}${i === cur ? ' on' : ''}" title="g${i}"></span>`).join('');
+  }
+  function rng(seed) { let s = seed; return () => ((s = (s * 9301 + 49297) % 233280) / 233280); }
+  function grassData(u) {
+    const r = rng(u.seed);
+    const monday = new Date(TODAY); monday.setDate(TODAY.getDate() - ((TODAY.getDay() + 6) % 7));
+    const start = new Date(monday); start.setDate(monday.getDate() - (WEEKS - 1) * 7);
+    const days = [];
+    for (let i = 0; i < WEEKS * 7; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      let n = r() < u.rate ? 1 + Math.floor(r() * u.max) : 0;
+      const isToday = d.getTime() === TODAY.getTime();
+      if (isToday) n = u.today;
+      days.push({ d, n, isToday, future: d > TODAY });
+    }
+    return days;
+  }
+  const level = (n) => (n === 0 ? 0 : n <= 2 ? 1 : n <= 4 ? 2 : n <= 6 ? 3 : 4);
+
+  function grassHTML(u) {
+    const days = grassData(u);
+    let html = '';
+    let lastMonth = -1, lastCol = -9;
+    for (let w = 0; w < WEEKS; w++) {
+      const m = days[w * 7].d.getMonth();
+      if (m !== lastMonth) {
+        if (w - lastCol >= 3 || lastCol < 0) {
+          // 첫 열의 달 이름이 다음 달 이름과 겹치면 생략
+          const nextChange = days.findIndex((x, i) => i > w * 7 && i % 7 === 0 && x.d.getMonth() !== m);
+          if (!(w === 0 && nextChange > -1 && nextChange / 7 < 3)) {
+            html += `<span class="m" style="grid-column:${w + 2}">${m + 1}월</span>`;
+            lastCol = w;
+          }
+        }
+        lastMonth = m;
+      }
+    }
+    ['월', '', '수', '', '금', '', ''].forEach((t, i) => { if (t) html += `<span class="w" style="grid-row:${i + 2}">${t}</span>`; });
+    days.forEach((x, i) => {
+      const col = Math.floor(i / 7) + 2, row = (i % 7) + 2;
+      const label = `${x.d.getMonth() + 1}월 ${x.d.getDate()}일 ${x.n}`;
+      html += `<span class="c l${level(x.n)}${x.isToday ? ' today' : ''}${x.future ? ' future' : ''}" style="grid-column:${col};grid-row:${row}" ${x.future ? 'aria-hidden="true"' : `role="img" aria-label="${label}"`}></span>`;
+    });
+    return `<div class="grass">${html}</div><div class="grass-legend" aria-hidden="true">${[0, 1, 2, 3, 4].map((l) => `<span class="c l${l}"></span>`).join('')}</div>`;
+  }
+
+  function profileHTML(ov = {}) {
+    const u = USERS[user];
+    const shownName = ov.name ?? names[user], shownPhoto = ov.photo ?? photos[user];
+    const on = (k) => !!opts[k];
+    const video = opts.video;
+    const cover = video ? `<div class="pp-cover">
+        <div class="pp-video" aria-hidden="true"><div class="scene s1 on"></div><div class="scene s2"></div><div class="scene s3"></div><div class="scene s4"></div></div>
+        <span class="anno-pos">${anno(1)}</span>
+        <button class="icon-button pp-pause" aria-label="영상 정지">${icon('pause')}</button>
+      </div>` : `<div class="pp-cover plain g${gradientIndex(u.profileId)}"><span class="anno-pos">${anno(1)}</span></div>`;
+    const focus = on('focus') ? `<dl class="pp-stat"><dt>집중 시간</dt><dd>${u.focus}</dd></dl>` : '';
+    const projects = on('projects') ? `<section class="paper alt pp-projects tilt-b"><h2>프로젝트${anno(5)}</h2><ul>${u.projects.map((p) => `<li><i class="project-dot" style="background:${p.color}"></i><span class="name">${p.name}</span><span class="cnt">${tomato()}${p.count}</span></li>`).join('')}</ul></section>` : '';
+    const tickets = on('tasks') ? `<section class="pp-tickets-wrap"><h2 style="margin:6px 4px 14px">완료한 할 일${anno(5)}</h2><div class="pp-tickets">${u.tickets.map((t, i) => {
+        const p = u.projects[t.project];
+        const slots = Math.max(t.estimate, t.used);
+        return `<article class="ticket ${i % 2 ? 'tilt-big-b' : 'tilt-big-a'}">
+          <span class="tape l ${i % 2 ? 'green' : 'pink'}" aria-hidden="true"></span>
+          <div class="stub"><span class="tomatoes">${Array.from({ length: slots }, (_, k) => tomato(k < t.used)).join('')}</span><span class="num muted">${t.used} / ${t.estimate}</span></div>
+          <span class="notch t"></span><span class="notch b"></span>
+          <div class="ticket-body"><span class="ticket-title">${t.title}</span>
+            <span class="ticket-meta">${on('projects') ? `<span class="chip"><i class="project-dot" style="background:${p.color}"></i>${p.name}</span>` : ''}<span class="muted">${t.time}</span></span>
+            ${on('memo') && t.note ? `<span class="ticket-note">${t.note}</span>` : ''}
+          </div>
+          <div class="datestamp" aria-hidden="true">11.8<br>완료</div>
+        </article>`;
+      }).join('')}</div></section>` : '';
+    const stamps = Array.from({ length: u.today }, () => tomato()).join('');
+    return `<div class="pp ${video ? 'has-video' : 'no-video'}">
+      ${cover}
+      <div class="pp-body over-cover">
+        <div class="pp-side">
+          <header class="paper pp-head tilt-c"><span class="tape" aria-hidden="true"></span>${shownPhoto ? '<span class="avatar" role="img" aria-label="프로필 사진"></span>' : ''}<h1>${shownName}</h1>${anno(2)}</header>
+          <section class="paper peach pp-today">
+            <h2>오늘 완료한 포모도로${anno(3)}</h2>
+            <p class="pp-count"><span class="big">${u.today}</span></p>
+            <div class="tomatoes" aria-hidden="true">${stamps}</div>
+            ${focus}
+          </section>
+        </div>
+        <div class="pp-main">
+          <section class="paper pp-grass" aria-label="날짜별 활동">${anno(4)}${grassHTML(u)}</section>
+          ${projects}
+          ${tickets}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function switchRows(prefix, withAnno) {
+    const a = (n) => (withAnno ? anno(n) : '');
+    const sw = (k, label, extra = '') => {
+      const disabled = k === 'memo' && !opts.tasks;
+      return `<li class="share-row ${extra}"><span class="lbl" id="lbl-${prefix}-${k}">${label}</span><button type="button" class="sw" role="switch" data-opt="${k}" aria-checked="${!!opts[k]}" aria-labelledby="lbl-${prefix}-${k}" ${disabled ? 'disabled' : ''}></button></li>`;
+    };
+    return `<li class="share-row fixed"><span class="lbl">잔디${a(2)}</span>${icon('lock', 'lock')}</li>
+          <li class="share-row fixed"><span class="lbl">오늘 완료한 포모도로</span>${icon('lock', 'lock')}</li>
+          ${sw('video', `주간 영상${a(3)}`)}
+          ${sw('focus', `집중 시간${a(4)}`)}
+          ${sw('projects', '프로젝트')}
+          ${sw('tasks', '완료한 할 일')}
+          ${sw('memo', `티켓 메모${a(5)}`, 'sub')}`;
+  }
+  function photoField() {
+    return `${draft.photo ? '<span class="avatar" role="img" aria-label="프로필 사진"></span>' : '<span class="avatar-empty" aria-hidden="true"></span>'}
+      <button type="button" class="btn-line photo-toggle">${draft.photo ? '사진 삭제' : '사진 추가'}</button>`;
+  }
+  function appHTML(kind) {
+    const tabs = [['todo', '할 일', 'todo'], ['projects', '프로젝트', 'folder'], ['calendar', '캘린더', 'calendar'], ['log', '집중 로그', 'camera'], ['settings', '설정', 'settings']];
+    const active = 'log';
+    const settingsCard = `<section class="settings-card share-card" aria-labelledby="share-title-${kind}">
+        <h2 id="share-title-${kind}">공유 프로필${anno(1)}</h2>
+        <ul class="share-list">
+          <li class="share-row fixed"><span class="lbl">표시 이름${anno(6)}</span><span class="name-val">${kind === 'share' && !shared[user] ? '없음' : `${photos[user] ? '<span class="avatar sm" role="img" aria-label="프로필 사진"></span>' : ''}${names[user]}<button class="text-button edit-name">수정</button>`}</span></li>
+          ${switchRows(kind, kind === 'settings')}
+        </ul>
+      </section>`;
+    const body = kind === 'settings'
+      ? `<div class="log-intro"><h1>집중 로그</h1><p>집중 완료 후 촬영한 3초 영상을 주별로 모읍니다.</p></div>
+         ${settingsCard}
+         <div class="dim" aria-hidden="true"><div class="ghost-block"></div><div class="ghost-line"></div><div class="ghost-block" style="height:220px"></div></div>`
+      : `<div class="dim" aria-hidden="true"><div class="log-intro"><h1>집중 로그</h1><p>집중 완료 후 촬영한 3초 영상을 주별로 모읍니다.</p></div><div class="ghost-block" style="height:180px"></div><div class="ghost-line"></div><div class="ghost-block" style="height:260px"></div></div>`;
+    const menuOpen = kind === 'share' && shareMenuOpen;
+    return `<nav class="tabs" aria-label="작업 영역 탭">${tabs.map(([id, l, ic]) => `<span class="tab ${id === active ? 'active' : ''}">${icon(ic)}${l}</span>`).join('')}</nav>
+      <section class="workspace" aria-label="작업 영역">
+        <div class="workspace-heading">
+          ${kind === 'share' ? anno(1) : ''}
+          <div class="share-wrap">
+            <button class="btn-line share-btn" aria-haspopup="menu" aria-expanded="${menuOpen}">${icon('share')}공유하기</button>
+            <div class="share-menu" role="menu" ${menuOpen ? '' : 'hidden'}>
+              <button role="menuitem" class="share-profile">${icon('link')}프로필 공유하기${kind === 'share' ? anno(2) : ''}</button>
+            </div>
+          </div>
+          <span class="date-label">11월 8일 (일)</span>
+        </div>
+        ${body}
+      </section>
+      <aside class="execution dim" aria-hidden="true"><div class="timer-ghost"></div><div class="list-ghost"><i></i><i></i><i></i></div></aside>
+      <div class="toast" role="status">링크를 복사했습니다.${kind === 'share' ? anno(3) : ''}</div>
+      <div class="name-layer" hidden>
+        <dialog open aria-labelledby="name-title-${kind}" aria-modal="true">
+          <form class="name-form" novalidate>
+            <div class="dialog-heading">
+              <h2 id="name-title-${kind}"></h2>
+              <button type="button" class="icon-button name-close" aria-label="닫기">✕</button>
+            </div>
+            <div class="first-grid">
+              <div>
+                <label>표시 이름${anno(4)}<input name="displayName" maxlength="20" autocomplete="nickname" aria-describedby="name-error-${kind}"></label>
+                <p class="name-count"></p>
+                <p class="form-error" id="name-error-${kind}" role="alert" hidden></p>
+                <h3 class="field-title">사진${anno(6)}</h3>
+                <div class="photo-field"></div>
+                <h3 class="field-title first-only">공개 범위${anno(7)}</h3>
+                <ul class="share-list first-only dialog-switches"></ul>
+              </div>
+              <div class="first-only">
+                <h3 class="field-title" style="margin-top:0">미리보기${anno(8)}</h3>
+                <div class="mini-screen"></div>
+              </div>
+            </div>
+            <div class="dialog-footer"><button class="primary" type="submit">저장${anno(5)}</button></div>
+          </form>
+        </dialog>
+      </div>`;
+  }
+
+  // 렌더링
+  let sceneTimer = null, paused = false;
+  function render(skip) {
+    document.querySelectorAll('[data-profile]').forEach((el) => {
+      const top = el.scrollTop; el.innerHTML = profileHTML(); el.scrollTop = top;
+    });
+    document.querySelectorAll('[data-app]').forEach((el) => { if (el !== skip) el.innerHTML = appHTML(el.dataset.app); });
+    if (skip) refreshDialog(skip);
+    applyPause();
+    renderSwatches();
+  }
+  function applyPause() {
+    document.querySelectorAll('.pp').forEach((p) => p.classList.toggle('paused', paused));
+    document.querySelectorAll('.pp-pause').forEach((b) => {
+      b.setAttribute('aria-label', paused ? '영상 재생' : '영상 정지');
+      b.innerHTML = icon(paused ? 'play' : 'pause');
+    });
+  }
+  let scene = 0;
+  function tickScene() {
+    if (paused) return;
+    scene = (scene + 1) % 4;
+    document.querySelectorAll('.pp-video').forEach((v) => v.querySelectorAll('.scene').forEach((s, i) => s.classList.toggle('on', i === scene)));
+  }
+  sceneTimer = setInterval(tickScene, 3000);
+
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  paused = reduce.matches;
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('button'); if (!t) return;
+    const seg = t.closest('.rv-seg');
+    if (seg) {
+      seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === t)));
+      if (t.dataset.v) document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + t.dataset.v));
+      if (t.dataset.u) { user = t.dataset.u; setPreset(); render(); }
+      return;
+    }
+    if (t.classList.contains('sw')) {
+      opts[t.dataset.opt] = !opts[t.dataset.opt];
+      const layer = t.closest('.name-layer');
+      if (layer) { render(t.closest('.mock-app')); layer.querySelector(`.sw[data-opt="${t.dataset.opt}"]`).focus(); }
+      else render();
+      return;
+    }
+    if (t.classList.contains('photo-toggle')) {
+      draft.photo = !draft.photo; const app = t.closest('.mock-app'); refreshDialog(app);
+      app.querySelector('.photo-toggle').focus(); return;
+    }
+    if (t.classList.contains('pp-pause')) { paused = !paused; applyPause(); return; }
+    if (t.classList.contains('share-btn')) {
+      const menu = t.nextElementSibling; const open = menu.hidden;
+      menu.hidden = !open; t.setAttribute('aria-expanded', String(open)); shareMenuOpen = false;
+      if (open) menu.querySelector('button').focus();
+      return;
+    }
+    if (t.classList.contains('share-profile')) {
+      // 시안: 네트워크 요청과 클립보드 변경 없이 알림만 보여준다
+      const app = t.closest('.mock-app');
+      const menu = t.closest('.share-menu'); menu.hidden = true; shareMenuOpen = false;
+      const btn = app.querySelector('.share-btn'); btn.setAttribute('aria-expanded', 'false');
+      if (!shared[user]) { openName(app, 'first'); return; }
+      btn.focus(); showToast(app);
+      return;
+    }
+    if (t.classList.contains('edit-name')) { openName(t.closest('.mock-app'), 'edit'); return; }
+    if (t.classList.contains('name-close')) { closeName(t.closest('.mock-app')); return; }
+    if (t.dataset.reset !== undefined) { shared.kim = shared.lee = false; render(); return; }
+  });
+  function showToast(app) {
+    const toast = app.querySelector('.toast'); toast.classList.add('visible');
+    clearTimeout(toast._t); toast._t = setTimeout(() => toast.classList.remove('visible'), 2600);
+  }
+  function openName(app, mode) {
+    const layer = app.querySelector('.name-layer'); layer.hidden = false; layer.dataset.mode = mode;
+    layer.querySelector('h2').textContent = mode === 'first' ? '프로필 공유하기' : '표시 이름 수정';
+    layer.querySelector('dialog').classList.toggle('wide', mode === 'first');
+    draft = mode === 'edit' ? { name: names[user], photo: photos[user] } : { name: '', photo: false };
+    rangeSnapshot = mode === 'first' ? { ...opts } : null;
+    const input = layer.querySelector('input'); input.value = draft.name;
+    refreshDialog(app);
+    layer.querySelector('.form-error').hidden = true; input.removeAttribute('aria-invalid');
+    updateCount(input); input.focus();
+  }
+  function refreshDialog(app) {
+    const layer = app.querySelector('.name-layer'); if (!layer || layer.hidden) return;
+    layer.querySelector('.photo-field').innerHTML = photoField();
+    layer.querySelector('.dialog-switches').innerHTML = switchRows(app.dataset.app + '-d', false);
+    const mini = layer.querySelector('.mini-screen'); const top = mini.scrollTop;
+    mini.innerHTML = profileHTML({ name: draft.name, photo: draft.photo }); mini.scrollTop = top;
+    applyPause();
+  }
+  function closeName(app) {
+    const layer = app.querySelector('.name-layer'); const mode = layer.dataset.mode;
+    layer.hidden = true;
+    if (mode === 'first' && rangeSnapshot) { Object.assign(opts, rangeSnapshot); rangeSnapshot = null; render(); }
+    const target = mode === 'edit' ? app.querySelector('.edit-name') : app.querySelector('.share-btn');
+    target?.focus();
+  }
+  function updateCount(input) { input.closest('form').querySelector('.name-count').textContent = `${[...input.value].length} / 20`; }
+  document.addEventListener('input', (e) => {
+    if (e.target.name !== 'displayName') return;
+    updateCount(e.target); e.target.closest('form').querySelector('.form-error').hidden = true; e.target.removeAttribute('aria-invalid');
+    draft.name = e.target.value.trim();
+    const mini = e.target.closest('.name-layer').querySelector('.pp-head h1'); if (mini) mini.textContent = draft.name;
+  });
+  document.addEventListener('submit', (e) => {
+    if (!e.target.classList.contains('name-form')) return;
+    e.preventDefault();
+    const app = e.target.closest('.mock-app'); const layer = app.querySelector('.name-layer');
+    const input = e.target.displayName; const value = input.value.trim();
+    if (!value) {
+      const err = e.target.querySelector('.form-error'); err.textContent = '표시 이름을 입력하세요.'; err.hidden = false;
+      input.setAttribute('aria-invalid', 'true'); input.focus(); return;
+    }
+    const mode = layer.dataset.mode;
+    names[user] = value; photos[user] = draft.photo; shared[user] = true; rangeSnapshot = null;
+    const kind = app.dataset.app;
+    render();
+    const fresh = document.querySelector(`[data-app="${kind}"]`);
+    if (mode === 'first') { fresh.querySelector('.share-menu').hidden = true; fresh.querySelector('.share-btn').setAttribute('aria-expanded', 'false'); fresh.querySelector('.share-btn').focus(); showToast(fresh); }
+    else fresh.querySelector('.edit-name')?.focus();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll('.name-layer:not([hidden])').forEach((l) => closeName(l.closest('.mock-app')));
+    document.querySelectorAll('.share-menu:not([hidden])').forEach((m) => {
+      m.hidden = true; const b = m.previousElementSibling; b.setAttribute('aria-expanded', 'false'); b.focus();
+    });
+  });
+  document.getElementById('annoToggle').addEventListener('change', (e) => document.body.classList.toggle('show-anno', e.target.checked));
+  const motion = document.getElementById('motionToggle');
+  motion.checked = reduce.matches;
+  motion.addEventListener('change', () => { paused = motion.checked; applyPause(); });
+
+  render();
+})();
+</script>
+</body>
+</html>

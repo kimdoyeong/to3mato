@@ -45,6 +45,18 @@ contextBridge.exposeInMainWorld('to3mato', {
     readAsset: (id, owner) => ipcRenderer.invoke('sync:asset-read', id, owner),
     projectImages: () => ipcRenderer.invoke('sync:project-images'),
   },
+  profile: {
+    load: () => ipcRenderer.invoke('profile:load'),
+    pickPhoto: () => ipcRenderer.invoke('profile:pickPhoto'),
+    photoPreview: (photoPath) =>
+      ipcRenderer.invoke('profile:photoPreview', photoPath),
+    save: (input) => ipcRenderer.invoke('profile:save', input),
+    uploadVideo: (id, mime, bytes) =>
+      ipcRenderer.invoke('profile:uploadVideo', id, mime, bytes),
+    removeVideos: () => ipcRenderer.invoke('profile:removeVideos'),
+    stop: () => ipcRenderer.invoke('profile:stop'),
+    copyLink: (slug) => ipcRenderer.invoke('profile:copyLink', slug),
+  },
   version: () => ipcRenderer.invoke('app:version'),
   update: {
     check: () => ipcRenderer.invoke('update:check'),

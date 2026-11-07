@@ -32,6 +32,9 @@
   import DeliveryNotice from './components/DeliveryNotice.svelte';
   import EstimatePicker from './components/EstimatePicker.svelte';
   import Onboarding from './components/Onboarding.svelte';
+  import ShareMenu from './components/ShareMenu.svelte';
+  import ShareDialog from './components/ShareDialog.svelte';
+  import { startShareProfile } from './lib/share-profile';
   let batchDialog: {
     open: (
       id: string,
@@ -99,17 +102,20 @@
         planOpen.set(true);
       } else if (kind === 'review') reviewOpen = true;
     });
+    let stopShare: (() => void) | undefined;
     initialize().then((fn) => {
       if (disposed) fn();
       else {
         cleanup = fn;
         void loadRitualDates();
+        stopShare = startShareProfile();
       }
     });
     return () => {
       disposed = true;
       cleanup?.();
       stopRitual?.();
+      stopShare?.();
     };
   });
   async function openTask(
@@ -223,6 +229,7 @@
       <section class="workspace" aria-label="작업 영역">
         {#if reviewOpen}<ReviewView onclose={closeReview} />{:else}
           <div class="workspace-heading">
+            <ShareMenu />
             <span id="date-label"
               >{new Date($now).toLocaleDateString('ko-KR', {
                 month: 'long',
@@ -439,3 +446,4 @@
     onopen={() => (tab = 'log')}
   />{/if}
 <Onboarding />
+{#if $ready}<ShareDialog />{/if}
