@@ -38,7 +38,10 @@
     busy = $state(false),
     nameError = $state(''),
     photoError = $state(''),
-    error = $state('');
+    error = $state(''),
+    // The form exists only while the dialog is open, so its labels never
+    // collide with other controls of the same name on the page.
+    shown = $state(false);
 
   $effect(() => {
     const request = $dialogRequest;
@@ -54,6 +57,7 @@
     photo = 'keep';
     photoUrl = request === 'edit' ? $profilePhoto : '';
     slug = $profile?.slug || '';
+    shown = true;
     await tick();
     dialog.showModal();
     dialog.querySelector<HTMLInputElement>('input')?.focus();
@@ -71,6 +75,7 @@
     dialog.close();
   }
   function cleanup() {
+    shown = false;
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     videoUrl = '';
     // Focus goes back to the share button the request came from.
@@ -80,7 +85,7 @@
 
   // The weekly video is shown only while its switch is on and last week has a delivery.
   $effect(() => {
-    const on = mode === 'first' && draft.video && dialog?.open;
+    const on = mode === 'first' && draft.video && shown;
     const delivery = on ? freshDelivery() : null;
     if (!delivery) {
       if (videoUrl) URL.revokeObjectURL(videoUrl);
@@ -193,7 +198,7 @@
   }}
   onclose={cleanup}
 >
-  <form onsubmit={submit} novalidate>
+  {#if shown}<form onsubmit={submit} novalidate>
     <div class="dialog-heading">
       <h2 id="share-dialog-title">
         {mode === 'first' ? COPY.shareProfile : COPY.editName}
@@ -266,7 +271,7 @@
     <div class="dialog-footer">
       <button class="primary" type="submit" disabled={busy}>{COPY.save}</button>
     </div>
-  </form>
+  </form>{/if}
 </dialog>
 
 <style>
