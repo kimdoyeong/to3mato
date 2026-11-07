@@ -1,7 +1,7 @@
 # To3mato 도메인 전환 계획
 
 작성일: 2026-11-05
-상태: 진행 중. `to3mato.com` 구입 완료(Cloudflare 네임서버 `amy`, `gordon`). 1단계 사이트 전환과 2단계 메일 발송 전환 완료. 하위 도메인 이름과 단계별 시점은 "결정할 것"에 답을 받은 뒤 정한다.
+상태: 완료(2026-11-08). 1단계 사이트 전환과 2단계 메일 발송 전환을 끝냈다. 3~6단계와 아래 "남은 일"은 필요할 때 따로 진행한다.
 
 ## 목표
 
@@ -147,4 +147,11 @@ R2 버킷에 `to3mato.com` 쪽 다운로드 하위 도메인을 하나 더 연�
 1. 공유 페이지 하위 도메인 이름.
 2. 약관·개인정보처리방침의 문의 주소를 `to3mato.com` 쪽으로 바꾸는가. 바꾸면 페이지 수정은 사이트 재배포가 필요하고 `SITE_RELEASE_DIR`로 현재 공개 버전의 릴리스 폴더를 지정한다.
 3. iOS 로그인을 Universal Link로 바꾸는가, `to3mato://` 스킴을 유지하는가.
-4. 1단계(사이트)를 2단계 뒤 언제 진행하는가.
+
+## 남은 일
+
+2026-11-08 확인 기준.
+
+- Resend의 `doyeong.dev` 도메인과 전용 API 키 정리. `resend._domainkey.doyeong.dev`, `send.doyeong.dev` 레코드가 아직 있다. `doyeong.dev`의 Email Routing(`hello@doyeong.dev`)은 유지한다.
+- DMARC를 `p=none`에서 `p=quarantine`으로 올린다.
+- 로그인 링크용 메일 템플릿. 지금은 Supabase 기본 템플릿이 나간다. `supabase/templates/code.html`은 링크가 없어 그대로 쓸 수 없다.
