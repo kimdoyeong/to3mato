@@ -53,21 +53,23 @@ const outputOf = (error) =>
     .join('\n');
 const sleep = (ms) =>
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-// Ticket validation is an online lookup and can fail transiently right after
-// notarization. Retry a few times; a bundle without a ticket still fails.
-const validateStaple = (target) => {
+// Stapling and ticket validation are online lookups to Apple and can drop the
+// connection transiently right after notarization. Retry a few times; a bundle
+// without a ticket still fails on the last attempt.
+const retryStapler = (action, target, attempts = 5) => {
   for (let attempt = 1; ; attempt++) {
     try {
-      return run('xcrun', ['stapler', 'validate', target]);
+      return run('xcrun', ['stapler', action, target]);
     } catch (error) {
-      if (attempt >= 3) throw error;
+      if (attempt >= attempts) throw error;
       console.warn(
-        `stapler validate 실패 (${attempt}/3), ${5 * attempt}초 후 재시도: ${outputOf(error) || error.message}`,
+        `stapler ${action} 실패 (${attempt}/${attempts}), ${15 * attempt}초 후 재시도: ${outputOf(error) || error.message}`,
       );
-      sleep(5000 * attempt);
+      sleep(15000 * attempt);
     }
   }
 };
+const validateStaple = (target) => retryStapler('validate', target);
 
 const validateApp = (appPath) => {
   run('codesign', [
@@ -165,7 +167,7 @@ try {
   save(receipt);
   console.log(`Apple 공증 상태: ${info.status}`);
   if (info.status === 'Accepted') {
-    console.log(run('xcrun', ['stapler', 'staple', dmg]).trim());
+    console.log(retryStapler('staple', dmg).trim());
     // Persist the new hash immediately so a later validation retry never reuploads.
     receipt.stapledSha256 = hash();
     save(receipt);
