@@ -64,4 +64,4 @@
 2026-11-08 공개 프로필 서버 배포.
 
 - Supabase에 `public_profiles` 마이그레이션(버전 202611080001)을 적용하고 `delete-account` 함수를 다시 배포했다.
-- 공개 페이지 Worker `to3mato-profile`을 `me.to3mato.com`에 배포했다. 공유 기능이 들어간 앱 릴리스는 아직이다.
+- 공개 페이지 Worker `to3mato-profile`을 `me.to3mato.com`에 배포했다. 공유 기능이 들어간 앱 0.7.0을 같은 날 릴리스했다.
