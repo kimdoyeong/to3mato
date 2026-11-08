@@ -1,0 +1,24 @@
+// me.to3mato.com public profile Worker.
+// Build static assets first: `npm run profile:build` (writes workers/profile/public/).
+// SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are left empty here on purpose; pass them at
+// deploy time, e.g.
+//   npm run profile:deploy -- --var SUPABASE_URL:https://<ref>.supabase.co --var SUPABASE_PUBLISHABLE_KEY:<publishable key>
+// Without them every profile path answers 503.
+{
+  "name": "to3mato-profile",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "me.to3mato.com", "custom_domain": true }],
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "none",
+    "html_handling": "none"
+  },
+  "observability": { "enabled": true },
+  "vars": {
+    "SUPABASE_URL": "",
+    "SUPABASE_PUBLISHABLE_KEY": ""
+  }
+}

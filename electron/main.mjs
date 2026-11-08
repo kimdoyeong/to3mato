@@ -10,6 +10,8 @@ import {
   Notification,
   autoUpdater as nativeUpdater,
   safeStorage,
+  clipboard,
+  nativeImage,
 } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -17,6 +19,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SQLiteStore } from './storage.mjs';
 import { createAccountSync } from './sync.mjs';
+import { createPublicProfile, PHOTO_EXTENSIONS } from './public-profile.mjs';
+import { PROFILE_ORIGIN } from '../src/lib/public-profile.mjs';
 import { createOnboarding, onboardingMode } from './onboarding.mjs';
 import { setCalendarTimeZone } from '../src/lib/calendar-time.mjs';
 import { createTimerTray } from './tray.mjs';
@@ -633,6 +637,43 @@ if (!app.requestSingleInstanceLock()) {
           trusted(event);
           return account.importProjectImages();
         });
+        const profile = createPublicProfile({
+          session: () => account.session(),
+          nativeImage,
+          clipboard,
+          origin: PROFILE_ORIGIN,
+        });
+        const profileMethods = {
+          load: () => profile.load(),
+          async pickPhoto() {
+            const result = await dialog.showOpenDialog(window, {
+              properties: ['openFile'],
+              filters: [{ name: 'Image', extensions: PHOTO_EXTENSIONS }],
+            });
+            if (result.canceled || !result.filePaths[0]) return null;
+            try {
+              return profile.preparePhoto(result.filePaths[0]);
+            } catch (failure) {
+              // Errors lose their fields over IPC, so the code travels as data.
+              return { error: failure.code || 'read' };
+            }
+          },
+          photoPreview: (photoPath) => profile.photoPreview(photoPath),
+          save: (input) => {
+            if (!input || typeof input !== 'object' || JSON.stringify(input).length > 131072)
+              throw new Error('잘못된 요청입니다.');
+            return profile.save(input);
+          },
+          uploadVideo: (id, mime, bytes) => profile.uploadVideo(id, mime, bytes),
+          removeVideos: () => profile.removeVideos(),
+          stop: () => profile.stop(),
+          copyLink: (slug) => profile.copyLink(slug),
+        };
+        for (const [method, handler] of Object.entries(profileMethods))
+          ipcMain.handle(`profile:${method}`, (event, ...args) => {
+            trusted(event);
+            return handler(...args);
+          });
         await account.restore();
         Menu.setApplicationMenu(
           Menu.buildFromTemplate([

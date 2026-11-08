@@ -1,11 +1,25 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
+import fs from 'node:fs/promises';
 import { syncPostgres, USER_A, USER_B } from './sync-postgres.mjs';
 
 /** HTTP/Auth/Realtime adapter around real PostgreSQL for isolated app integration. */
 export async function syncHttpServer() {
   const pg = await syncPostgres();
+  await pg.db.exec(
+    await fs.readFile(
+      new URL(
+        '../../supabase/migrations/202611080001_public_profiles.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const asUser = (user, sql, params) =>
+    serialize(() => pg.as(user, () => pg.db.query(sql, params)));
+  /** Objects in the public profile bucket, keyed by path. */
+  const profileFiles = new Map();
   const files = new Map(),
     subscribers = new Map(),
     events = [],
@@ -159,6 +173,72 @@ export async function syncHttpServer() {
               );
         return;
       }
+      if (url.pathname === '/rest/v1/public_profiles') {
+        const { rows } = await asUser(
+          user,
+          'select slug,display_name,photo,visibility,active from public.public_profiles',
+        );
+        if (String(req.headers.accept).includes('vnd.pgrst.object'))
+          return rows[0]
+            ? reply(rows[0])
+            : reply({ code: 'PGRST116', message: 'no rows' }, 406);
+        return reply(rows);
+      }
+      if (url.pathname === '/rest/v1/rpc/profile_save')
+        return reply(
+          (
+            await asUser(
+              user,
+              'select public.profile_save($1,$2,$3::jsonb,$4::jsonb,$5) as result',
+              [
+                body.p_name ?? null,
+                body.p_photo ?? null,
+                body.p_visibility == null ? null : JSON.stringify(body.p_visibility),
+                body.p_snapshot == null ? null : JSON.stringify(body.p_snapshot),
+                body.p_activate ?? null,
+              ],
+            )
+          ).rows[0].result,
+        );
+      if (url.pathname === '/rest/v1/rpc/profile_stop')
+        return reply(
+          (await asUser(user, 'select public.profile_stop() as result')).rows[0]
+            .result,
+        );
+      if (url.pathname === '/storage/v1/object/list/profiles') {
+        const prefix = `${body.prefix}/`;
+        if (body.prefix !== user) return reply([]);
+        return reply(
+          [...profileFiles.keys()]
+            .filter((key) => key.startsWith(prefix))
+            .map((key) => ({ name: key.slice(prefix.length), id: key })),
+        );
+      }
+      if (url.pathname === '/storage/v1/object/profiles' && req.method === 'DELETE') {
+        const removed = (body.prefixes || []).filter(
+          (key) => key.startsWith(user + '/') && profileFiles.delete(key),
+        );
+        return reply(removed.map((name) => ({ name })));
+      }
+      const profilePath = url.pathname.replace(
+        /^\/storage\/v1\/object\/(?:authenticated\/|public\/)?profiles\//,
+        '',
+      );
+      if (profilePath !== url.pathname) {
+        if (req.method === 'POST' || req.method === 'PUT') {
+          if (!profilePath.startsWith(user + '/'))
+            return reply({ message: 'denied' }, 403);
+          if (profileFiles.has(profilePath) && req.headers['x-upsert'] !== 'true')
+            return reply({ message: 'already exists' }, 409);
+          profileFiles.set(profilePath, { bytes, mime: req.headers['content-type'] });
+          return reply({ Key: `profiles/${profilePath}` });
+        }
+        const file = profileFiles.get(profilePath);
+        if (!file) return reply({ message: 'not found' }, 404);
+        res.writeHead(200, { 'Content-Type': file.mime });
+        res.end(file.bytes);
+        return;
+      }
       const objectPath = url.pathname.replace(
         /^\/storage\/v1\/object\/(?:authenticated\/)?to3mato\//,
         '',
@@ -239,6 +319,7 @@ export async function syncHttpServer() {
     url: `http://127.0.0.1:${server.address().port}`,
     pg,
     events,
+    profileFiles,
     /** The callback URL a click on the last emailed link would open. */
     linkFor(email) {
       const link = links.get(email);

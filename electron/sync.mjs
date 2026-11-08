@@ -334,6 +334,8 @@ export function createAccountSync({
     assetRead: (id) => assets.read(id),
     importProjectImages: () => assets?.importProjectImages(),
     resolve: (id, action) => engine.resolve(id, action),
+    /** Signed-in Supabase client for account features outside sync (public profile). */
+    session: () => (user && auth ? { client: auth.client, userId: user.id } : null),
     async remove() {
       if (!user) throw new Error('로그인하세요.');
       const { data, error: failure } = await auth.client.functions.invoke(

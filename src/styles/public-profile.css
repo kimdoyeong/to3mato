@@ -1,0 +1,378 @@
+/*
+  공개 프로필 (me.to3mato.com과 앱 미리보기 공용)
+  tokens.css, components.css 뒤에 읽는다. 마크업은 src/lib/public-profile.mjs의 renderProfile()이 만든다.
+  배치는 .pp 컨테이너 너비 760px 기준으로 바뀐다.
+*/
+.pp {
+  container-type: inline-size;
+  position: relative;
+  min-height: 100%;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--bg-dots) 1.3px, transparent 1.5px);
+  background-size: 26px 26px;
+}
+
+/* ───────── 상단 배경: 주간 영상 또는 그라데이션 ───────── */
+.pp-cover {
+  position: relative;
+  height: 240px;
+  overflow: hidden;
+  background: #3b2a22;
+}
+.pp-cover video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pp-cover::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 90px;
+  background: linear-gradient(transparent, #fff3e3e6);
+  pointer-events: none;
+}
+.pp-cover .icon-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  color: var(--ink);
+}
+/* 그라데이션 6종. 공개 프로필 ID 해시로 하나를 고른다 */
+.pp-cover.g0 {
+  background: linear-gradient(165deg, var(--peach) 0%, var(--peach-deep) 38%, var(--tomato-half) 72%, var(--coral) 100%);
+}
+.pp-cover.g1 {
+  background: linear-gradient(165deg, var(--butter) 0%, var(--butter-deep) 55%, var(--highlight) 100%);
+}
+.pp-cover.g2 {
+  background: linear-gradient(165deg, var(--green-light) 0%, var(--tape-green) 40%, var(--leaf-light) 72%, var(--leaf) 100%);
+}
+.pp-cover.g3 {
+  background: linear-gradient(165deg, var(--peach-current) 0%, var(--peach) 40%, var(--peach-deep) 72%, var(--coral-light) 100%);
+}
+.pp-cover.g4 {
+  background: linear-gradient(165deg, var(--done) 0%, var(--kraft) 55%, var(--kraft-deep) 100%);
+}
+.pp-cover.g5 {
+  background: linear-gradient(165deg, var(--peach) 0%, var(--coral-light) 40%, var(--coral) 75%, var(--tomato-light) 100%);
+}
+
+/* ───────── 본문 ───────── */
+.pp-body {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  padding: 28px 16px 44px;
+  max-width: 1080px;
+  margin: -64px auto 0;
+}
+.pp-side,
+.pp-main {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  align-content: start;
+}
+.pp .paper {
+  padding: 20px 20px 22px;
+}
+.pp h2 {
+  font-size: var(--text-xl);
+  margin: 0 0 14px;
+}
+.pp-tickets-wrap h2 {
+  margin: 6px 4px 14px;
+}
+
+.pp-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 22px 22px 20px;
+}
+.pp-head h1 {
+  font-size: var(--text-h2-lg);
+  margin: 0;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.pp .avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 10px;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 0 var(--line-strong);
+  background: var(--kraft);
+}
+
+.pp-today h2 {
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  color: var(--muted);
+  letter-spacing: 0;
+  margin: 0;
+}
+.pp-count {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 2px 0 10px;
+}
+.pp-count .big {
+  font-family: var(--font-display);
+  font-size: 68px;
+  line-height: 1;
+  color: var(--red);
+  letter-spacing: -0.03em;
+}
+.pp-today .tomatoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pp-today .mini-tomato {
+  width: 24px;
+  height: 24px;
+}
+.pp-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  border-top: 2px dashed var(--peach-deep);
+  margin: 16px 0 0;
+  padding-top: 12px;
+  font-size: var(--text-md);
+}
+.pp-stat dt {
+  color: var(--muted);
+}
+.pp-stat dd {
+  margin: 0;
+  font-family: var(--font-num);
+  font-size: var(--text-xl);
+}
+
+/* ───────── 잔디 ───────── */
+.pp .grass {
+  display: grid;
+  grid-template-columns: 18px repeat(20, minmax(0, 1fr));
+  grid-template-rows: 16px repeat(7, auto);
+  gap: 3px;
+  max-width: 600px;
+}
+.pp .grass .m {
+  grid-row: 1;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  line-height: 16px;
+}
+.pp .grass .w {
+  grid-column: 1;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1;
+  align-self: center;
+}
+.pp .grass .c,
+.pp .grass-legend .c {
+  aspect-ratio: 1;
+  border-radius: 24% 30% 24% 30% / 30% 24% 30% 24%;
+  background: var(--paper-soft);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+}
+.pp .c.l1 {
+  background: var(--peach-deep);
+  box-shadow: none;
+}
+.pp .c.l2 {
+  background: var(--tomato-half);
+  box-shadow: none;
+}
+.pp .c.l3 {
+  background: var(--tomato);
+  box-shadow: none;
+}
+.pp .c.l4 {
+  background: var(--red-deep);
+  box-shadow: none;
+}
+.pp .grass .c.today {
+  outline: 2.5px solid var(--highlight);
+  outline-offset: 1px;
+}
+.pp .grass .c.future {
+  visibility: hidden;
+}
+.pp .grass-legend {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 3px;
+  margin-top: 12px;
+  max-width: 600px;
+}
+.pp .grass-legend .c {
+  width: 12px;
+}
+
+/* ───────── 프로젝트 ───────── */
+.pp-projects ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pp-projects li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 2px dashed var(--line);
+  font-size: var(--text-md);
+}
+.pp-projects li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.pp-projects .name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pp-projects .cnt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-num);
+  color: var(--muted);
+}
+.pp-projects .mini-tomato {
+  width: 18px;
+  height: 18px;
+}
+
+/* ───────── 완료한 할 일 티켓 ───────── */
+.pp-tickets {
+  display: grid;
+  gap: 16px;
+}
+.pp .ticket {
+  min-height: 104px;
+}
+.pp .ticket-body {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+.pp .ticket-title {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.pp .ticket-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.pp .ticket-note {
+  font-size: 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.pp .ticket .stub {
+  width: 78px;
+}
+.pp .ticket .notch {
+  left: 68px;
+}
+.pp .ticket .stub .mini-tomato {
+  width: 14px;
+  height: 14px;
+}
+.pp .ticket .stub .tomatoes {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.pp .ticket .stub .num {
+  font-size: 13px;
+}
+.pp .tilt-big-a {
+  rotate: -1.2deg;
+}
+.pp .tilt-big-b {
+  rotate: 0.9deg;
+}
+.pp .datestamp {
+  width: 50px;
+  height: 50px;
+  font-size: 11px;
+  margin-right: 12px;
+}
+
+@container (min-width: 760px) {
+  .pp-cover {
+    height: 320px;
+  }
+  .pp-body {
+    grid-template-columns: 300px minmax(0, 1fr);
+    padding: 36px 40px 64px;
+    gap: 24px;
+    align-items: start;
+    margin-top: -90px;
+  }
+  .pp-side {
+    position: sticky;
+    top: 24px;
+    gap: 22px;
+  }
+  .pp-main {
+    gap: 22px;
+  }
+  .pp .paper {
+    padding: 24px 26px 26px;
+  }
+  .pp-head h1 {
+    font-size: var(--text-h1);
+  }
+  .pp-head .avatar {
+    width: 72px;
+    height: 72px;
+    margin-right: 14px;
+  }
+  .pp-count .big {
+    font-size: 84px;
+  }
+  .pp .grass {
+    gap: 4px;
+  }
+  .pp .ticket .stub {
+    width: 96px;
+  }
+  .pp .ticket .notch {
+    left: 86px;
+  }
+  .pp .datestamp {
+    width: 62px;
+    height: 62px;
+    font-size: 12px;
+    margin-right: 16px;
+  }
+}

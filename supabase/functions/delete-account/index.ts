@@ -24,18 +24,25 @@ Deno.serve(async (request) => {
     .update({ deleting: true })
     .eq('user_id', user.id);
   if (locked.error) return Response.json({ deleted: false }, { status: 503 });
-  for (;;) {
-    const files = await admin.storage
-      .from('to3mato')
-      .list(user.id, { limit: 100 });
-    if (files.error) return Response.json({ deleted: false }, { status: 503 });
-    if (!files.data.length) break;
-    const removed = await admin.storage
-      .from('to3mato')
-      .remove(files.data.map((file) => `${user.id}/${file.name}`));
-    if (removed.error)
-      return Response.json({ deleted: false }, { status: 503 });
-  }
+  // The public profile link stops answering before any file is removed.
+  const unshared = await admin
+    .from('public_profiles')
+    .delete()
+    .eq('user_id', user.id);
+  if (unshared.error) return Response.json({ deleted: false }, { status: 503 });
+  for (const bucket of ['to3mato', 'profiles'])
+    for (;;) {
+      const files = await admin.storage
+        .from(bucket)
+        .list(user.id, { limit: 100 });
+      if (files.error) return Response.json({ deleted: false }, { status: 503 });
+      if (!files.data.length) break;
+      const removed = await admin.storage
+        .from(bucket)
+        .remove(files.data.map((file) => `${user.id}/${file.name}`));
+      if (removed.error)
+        return Response.json({ deleted: false }, { status: 503 });
+    }
   const deleted = await admin.auth.admin.deleteUser(user.id);
   return Response.json(
     { deleted: !deleted.error },

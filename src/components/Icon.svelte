@@ -27,6 +27,9 @@
     star: '<path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8Z" fill="#f6dc92" stroke="#d9a84a" stroke-width="1.3" stroke-linejoin="round"/>',
     heart:
       '<path d="M12 20.5S4 15.5 4 9.9A4 4 0 0 1 12 8a4 4 0 0 1 8 1.9c0 5.6-8 10.6-8 10.6Z"/>',
+    share:
+      '<path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>',
+    link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
     prev: '<path d="m15 6-6 6 6 6"/>',
     next: '<path d="m9 6 6 6-6 6"/>',
   };

@@ -99,6 +99,20 @@ export type AccountStatus = {
     document?: unknown;
   }>;
 };
+export type Visibility = {
+  video: boolean;
+  focus: boolean;
+  projects: boolean;
+  tasks: boolean;
+  memo: boolean;
+};
+export type PublicProfile = {
+  slug: string;
+  name: string | null;
+  photo: string | null;
+  visibility: Visibility;
+  active: boolean;
+};
 export type Command = { type: string; payload?: Record<string, unknown> };
 export type UpdateStatus =
   | { status: 'idle' | 'checking' }
@@ -142,6 +156,30 @@ declare global {
           owner?: string,
         ): Promise<{ bytes: Uint8Array; mime: string } | null>;
         projectImages(): Promise<void>;
+      };
+      profile: {
+        load(): Promise<PublicProfile | null>;
+        pickPhoto(): Promise<
+          | { token: string; preview: string }
+          | { error: 'type' | 'size' | 'read' }
+          | null
+        >;
+        photoPreview(photoPath: string): Promise<string>;
+        save(input: {
+          name?: string | null;
+          photo?: string;
+          visibility: Visibility;
+          snapshot?: Record<string, unknown> | null;
+          activate?: boolean;
+        }): Promise<PublicProfile>;
+        uploadVideo(
+          id: string,
+          mime: string,
+          bytes: ArrayBuffer,
+        ): Promise<string>;
+        removeVideos(): Promise<void>;
+        stop(): Promise<PublicProfile | null>;
+        copyLink(slug: string): Promise<boolean>;
       };
       version(): Promise<string>;
       update: {

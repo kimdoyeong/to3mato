@@ -487,7 +487,7 @@ ui(
         });
       await window.to3mato!.dispatch({
         type: 'settings:save',
-        payload: { planAt: '00:00' },
+        payload: { planAt: '00:00', remindDays: [0, 1, 2, 3, 4, 5, 6] },
       });
       return { today, yesterday };
     });
