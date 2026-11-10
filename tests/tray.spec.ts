@@ -150,7 +150,13 @@ test('tray shares the desktop timer, survives closing the main window, and quits
     );
     try {
       await expect
-        .poll(() => popover.locator('#tray-clock').innerText())
+        .poll(async () => {
+          // The popover hides itself on blur and a hidden popover does not
+          // tick, so show it again if the machine's focus moved elsewhere.
+          if (!(await trayAction('snapshot')).visible)
+            await trayAction('click');
+          return popover.locator('#tray-clock').innerText();
+        })
         .not.toBe('01:00');
     } catch (error) {
       console.log(
@@ -164,7 +170,10 @@ test('tray shares the desktop timer, survives closing the main window, and quits
       );
       throw error;
     }
-    await trayAction('click');
+    // A focus change may already have hidden the popover. A tray click would
+    // then show it, while the last visibility event still reads false.
+    if ((await trayAction('snapshot')).visible) await trayAction('click');
+    expect((await trayAction('snapshot')).visible).toBe(false);
     await expect
       .poll(() => popover.evaluate(() => (window as any).trayVisibility.at(-1)))
       .toBe(false);
