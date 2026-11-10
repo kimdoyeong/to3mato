@@ -57,6 +57,18 @@ struct SettingsScreen: View {
           }
           .buttonStyle(SecondaryButtonStyle())
         }
+
+        if model.usage.available {
+          SettingsCard(title: "사용 통계") {
+            HStack {
+              Text("사용 통계 전송").font(.hand(TextSize.base)).foregroundStyle(Palette.ink)
+              Spacer()
+              Toggle("사용 통계 전송", isOn: Binding(get: { model.usage.enabled }, set: { model.setUsage($0) }))
+                .labelsHidden()
+                .tint(Palette.leaf)
+            }
+          }
+        }
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 20)
@@ -65,6 +77,8 @@ struct SettingsScreen: View {
     .background(DotBackground())
     .navigationTitle("설정")
     .navigationBarTitleDisplayMode(.inline)
+    .onAppear { model.settingsOpen = true }
+    .onDisappear { model.settingsOpen = false }
     .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
       guard case .success(let url) = result else { return }
       let scoped = url.startAccessingSecurityScopedResource()
@@ -79,7 +93,9 @@ struct SettingsScreen: View {
       isPresented: $exporting, document: JSONDocument(data: model.exportData()), contentType: .json,
       defaultFilename: "to3mato-\(model.today)"
     ) { result in
-      model.notify((try? result.get()) != nil ? "데이터를 내보냈습니다." : "데이터를 내보낼 수 없습니다.")
+      let saved = (try? result.get()) != nil
+      if saved { model.track("data_exported") }
+      model.notify(saved ? "데이터를 내보냈습니다." : "데이터를 내보낼 수 없습니다.")
     }
   }
 

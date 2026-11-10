@@ -7,13 +7,13 @@ import XCTest
 // node가 없는 환경에서는 건너뛴다.
 
 enum Reference {
-  static let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    .appendingPathComponent("Parity/reference.mjs")
+  static let directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    .appendingPathComponent("Parity")
 
-  static func run(_ jobs: [JSON]) throws -> [JSON] {
+  static func run(_ jobs: [JSON], script: String = "reference.mjs") throws -> [JSON] {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-    process.arguments = ["node", script.path]
+    process.arguments = ["node", directory.appendingPathComponent(script).path]
     var environment = ProcessInfo.processInfo.environment
     environment["PATH"] = (environment["PATH"] ?? "") + ":/opt/homebrew/bin:/usr/local/bin"
     process.environment = environment

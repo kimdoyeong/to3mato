@@ -31,7 +31,10 @@ struct RootView: View {
       ReviewScreen()
     }
     .fullScreenCover(isPresented: Binding(get: { !onboardingDone }, set: { onboardingDone = !$0 })) {
-      OnboardingScreen { onboardingDone = true }
+      OnboardingScreen {
+        onboardingDone = true
+        model.track("onboarding_finished")
+      }
     }
     .overlay(alignment: .top) { ToastView() }
     .task {

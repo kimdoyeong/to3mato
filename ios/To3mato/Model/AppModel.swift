@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SwiftUI
+import os
 import To3matoCloud
 import To3matoCore
 
@@ -28,15 +29,23 @@ final class AppModel {
   var deliveries: [Delivery] = []
 
   // 화면 상태
-  var tab: AppTab = .todo
+  var tab: AppTab = .todo { didSet { trackScreen() } }
   var runSheetOpen = false
-  var reviewOpen = false
+  var reviewOpen = false { didSet { trackScreen() } }
   var planOpen = false
   /// 계획·돌아보기를 마친 날짜. 연동 중에는 계정의 rituals 항목에서 읽는다.
   var plannedDate = ""
   var reviewedDate = ""
   var toast: String?
+  /// 사용 통계 전송 상태. 보낼 수 없는 빌드에서는 설정에 표시하지 않는다.
+  private(set) var usage = Analytics.Status()
+  /// 설정 화면이 열려 있는지. 화면 보고에만 쓴다.
+  @ObservationIgnored var settingsOpen = false { didSet { trackScreen() } }
 
+  @ObservationIgnored private let analytics = Analytics.app()
+  @ObservationIgnored private var firstLaunch = false
+  @ObservationIgnored private var opened = false
+  @ObservationIgnored private var viewedScreen = ""
   @ObservationIgnored private let liveActivity = LiveActivityController()
   @ObservationIgnored private let notifications = NotificationScheduler()
   @ObservationIgnored private let localStore = LocalStore(url: AppPaths.localState)
@@ -189,6 +198,7 @@ final class AppModel {
     } else {
       reviewedDate = date
     }
+    if ["plan", "review"].contains(kind) { track("ritual_finished", ["kind": .string(kind)]) }
     if active, let engine {
       Task {
         try? await engine.extra(
@@ -214,6 +224,9 @@ final class AppModel {
   // MARK: 시작
 
   func start() {
+    // 저장 파일을 만들기 전에 확인한다. 파일이 있으면 첫 실행이 아니다.
+    firstLaunch = !localStore.exists
+    usage = analytics.status()
     do {
       state = try localStore.load()
       if !localStore.exists { try localStore.save(state) }
@@ -224,6 +237,64 @@ final class AppModel {
     notifications.syncReminders(self)
     applyLaunchArguments()
     Task { await restoreAccount() }
+  }
+
+  // MARK: 사용 통계
+
+  /// 이벤트 이름과 정해진 값만 보낸다. 제목, 메모, 이름, ID는 넣지 않는다.
+  func track(_ event: String, _ properties: [String: JSON] = [:]) {
+    analytics.track(
+      event,
+      properties.merging(["signed_in": .bool(account.user != nil), "sync_enabled": .bool(active)]) { value, _ in value })
+  }
+
+  private func track(_ event: AnalyticsEvent?) {
+    if let event { track(event.event, event.properties) }
+  }
+
+  func setUsage(_ enabled: Bool) {
+    do {
+      usage = try analytics.setEnabled(enabled)
+    } catch {
+      usage = analytics.status()
+      notify(error.localizedDescription)
+    }
+  }
+
+  /// 실행마다 한 번, 로그인 여부를 확인한 뒤에 보고한다.
+  private func trackOpened() {
+    track("app_opened", ["first_launch": .bool(firstLaunch)])
+    opened = true
+    trackScreen()
+  }
+
+  private func trackScreen() {
+    let screen: String
+    if reviewOpen {
+      screen = "review"
+    } else if settingsOpen, tab == .todo {
+      screen = "settings"
+    } else {
+      switch tab {
+      case .todo: screen = "todo"
+      case .projects: screen = "projects"
+      case .calendar: screen = "calendar"
+      case .log: screen = "log"
+      }
+    }
+    guard opened, screen != viewedScreen else { return }
+    viewedScreen = screen
+    track(AnalyticsEvents.screen(screen))
+  }
+
+  /// 전송을 기다리지 않고 종료될 수 있다. 백그라운드로 갈 때 모아 둔 이벤트를 보낸다.
+  func flushUsage() {
+    guard usage.enabled else { return }
+    let task = UIApplication.shared.beginBackgroundTask()
+    Task {
+      await analytics.flush()
+      UIApplication.shared.endBackgroundTask(task)
+    }
   }
 
   // MARK: 명령
@@ -239,10 +310,12 @@ final class AppModel {
 
   /// 명령을 적용한다. 성공하면 success 문구를 알린다.
   func send(_ command: Command, success: String? = nil, then: (() -> Void)? = nil) {
+    let before = state
     if active, let engine {
       Task {
         do {
           state = try await engine.dispatch(command)
+          track(AnalyticsEvents.command(command, before: before))
           if let success { notify(success) }
           then?()
         } catch {
@@ -254,6 +327,8 @@ final class AppModel {
     do {
       state = try Domain.applyCommand(state, command, now: nowMs)
       try localStore.save(state)
+      AnalyticsEvents.records(before, state).forEach(track)
+      track(AnalyticsEvents.command(command, before: before))
       if let success { notify(success) }
       then?()
     } catch {
@@ -397,8 +472,10 @@ final class AppModel {
     }
     var next = state
     guard Domain.advanceTimer(&next, nowMs) else { return }
+    let before = state
     state = next
     try? localStore.save(state)
+    AnalyticsEvents.records(before, state).forEach(track)
   }
 
   func play(_ taskId: String) {
@@ -476,6 +553,7 @@ final class AppModel {
         Task {
           do {
             state = try await engine.importData(raw)
+            track("data_imported")
             notify("데이터를 가져왔습니다.")
           } catch {
             notify(error.localizedDescription)
@@ -490,6 +568,7 @@ final class AppModel {
       }
       state = next
       try localStore.save(state)
+      track("data_imported")
       notify("데이터를 가져왔습니다.")
     } catch let error as DomainError {
       notify(error.message)
@@ -512,13 +591,14 @@ final class AppModel {
   }
 
   private func restoreAccount() async {
-    guard let cloud = try? cloudAccount() else { return }
+    guard let cloud = try? cloudAccount() else { return trackOpened() }
     account.configured = true
     account.user = await cloud.restore()
     if let user = account.user, FileEnvelopeRepository.exists(root: AppPaths.root, owner: user.id) {
       try? connect(user: user, seed: nil)
-      if let engine, repository?.read().enabled == true { await engine.syncNow() }
     }
+    trackOpened()
+    if let engine, repository?.read().enabled == true { await engine.syncNow() }
     Task { [weak self] in
       for await user in cloud.changes {
         guard let self else { return }
@@ -532,11 +612,20 @@ final class AppModel {
     Task { [engine] in await engine?.destroy() }
     let repository = try FileEnvelopeRepository(root: AppPaths.root, owner: user.id, seed: seed ?? SyncProtocol.emptyState())
     let clock = SyncClock()
+    let deviceId = repository.read().deviceId
+    let last = OSAllocatedUnfairLock(initialState: SyncProtocol.projectedState(repository.read()))
     let engine = SyncEngine(
       repository: repository, transport: try cloudAccount().transport(userId: user.id), clock: clock,
       onChange: { [weak self] state, document, _ in
+        let previous = last.withLock { value in
+          defer { value = state }
+          return value
+        }
+        // 이 기기가 진행한 타이머의 기록만 센다. 다른 기기에서 받은 기록은 그 기기에서 센다(Mac과 같음).
+        let records = document.timer.controller == deviceId ? AnalyticsEvents.records(previous, state) : []
         Task { @MainActor in
           guard let self, self.active else { return }
+          records.forEach(self.track)
           try? CalendarTime.setZone(document.timeZone)
           self.state = state
           self.applyRituals(document)
@@ -576,6 +665,7 @@ final class AppModel {
         account.error = ""
         try await cloudAccount().requestLink(email: email.trimmingCharacters(in: .whitespaces))
         account.linkSent = true
+        track("login_link_requested")
       } catch {
         account.error = error.localizedDescription
       }
@@ -607,6 +697,7 @@ final class AppModel {
         if FileEnvelopeRepository.exists(root: AppPaths.root, owner: user.id), repository == nil {
           try connect(user: user, seed: nil)
         }
+        track("signed_in")
       } catch {
         if wasEnabled, let engine { try? await engine.enable() }
         account.error = error.localizedDescription
@@ -630,6 +721,7 @@ final class AppModel {
         }
         try repository?.backup()
         try await engine?.enable()
+        track("sync_enabled")
       } catch {
         account.error = error.localizedDescription
       }
@@ -637,7 +729,12 @@ final class AppModel {
   }
 
   func disableSync() {
-    Task { try? await engine?.disable() }
+    Task {
+      do {
+        try await engine?.disable()
+        track("sync_disabled")
+      } catch {}
+    }
   }
 
   func syncNow() {
@@ -645,6 +742,11 @@ final class AppModel {
   }
 
   func logout() {
+    signOut()
+    track("signed_out")
+  }
+
+  private func signOut() {
     // 기기 데이터로 먼저 돌아간다. 네트워크 로그아웃을 기다리는 동안 계정 데이터가 기기 파일에 저장되지 않게 한다.
     let engine = engine
     self.engine = nil
@@ -678,7 +780,7 @@ final class AppModel {
     Task {
       do {
         try await cloudAccount().deleteAccount()
-        logout()
+        signOut()
       } catch {
         account.error = error.localizedDescription
       }

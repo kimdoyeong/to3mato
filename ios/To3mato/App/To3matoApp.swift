@@ -38,6 +38,7 @@ struct To3matoApp: App {
     }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { model.resume() }
+      if phase == .background { model.flushUsage() }
     }
   }
 }
