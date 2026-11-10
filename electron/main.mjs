@@ -22,6 +22,14 @@ import { createAccountSync } from './sync.mjs';
 import { createPublicProfile, PHOTO_EXTENSIONS } from './public-profile.mjs';
 import { PROFILE_ORIGIN } from '../src/lib/public-profile.mjs';
 import { createOnboarding, onboardingMode } from './onboarding.mjs';
+import { analyticsMode, createAnalytics } from './analytics.mjs';
+import {
+  POSTHOG_KEY,
+  POSTHOG_HOST,
+  commandEvent,
+  recordEvents,
+  rendererEvent,
+} from '../src/lib/analytics.mjs';
 import { setCalendarTimeZone } from '../src/lib/calendar-time.mjs';
 import { createTimerTray } from './tray.mjs';
 import {
@@ -61,7 +69,7 @@ protocol.registerSchemesAsPrivileged([
 const dev = process.env.TO3MATO_DEV_URL;
 if (dev && new URL(dev).origin !== 'http://127.0.0.1:4173')
   throw new Error('Invalid development URL');
-let window, store, state, ticker, updater, account, onboarding;
+let window, store, state, ticker, updater, account, onboarding, analytics;
 let quitting = false;
 export let timerTray;
 if (!app.requestSingleInstanceLock()) {
@@ -79,11 +87,12 @@ if (!app.requestSingleInstanceLock()) {
     .then(async () => {
       // Read before the store creates the file: an existing database means an
       // upgrade, which skips the first-run walkthrough.
+      const existingInstall = fs.existsSync(
+        path.join(app.getPath('userData'), 'to3mato.sqlite3'),
+      );
       onboarding = createOnboarding(app.getPath('userData'), {
         mode: onboardingMode(),
-        existing: fs.existsSync(
-          path.join(app.getPath('userData'), 'to3mato.sqlite3'),
-        ),
+        existing: existingInstall,
       });
       try {
         store = new SQLiteStore(app.getPath('userData'));
@@ -97,6 +106,36 @@ if (!app.requestSingleInstanceLock()) {
         app.quit();
       }
       if (state) {
+        // Tests point a forced run at their own collector.
+        const analyticsForced = process.env.TO3MATO_ANALYTICS === 'on';
+        analytics = createAnalytics({
+          directory: app.getPath('userData'),
+          key:
+            (analyticsForced && process.env.TO3MATO_ANALYTICS_KEY) ||
+            POSTHOG_KEY,
+          host:
+            (analyticsForced && process.env.TO3MATO_ANALYTICS_HOST) ||
+            POSTHOG_HOST,
+          mode: analyticsMode(process.env, app.isPackaged),
+          fetch: (url, options) => net.fetch(url, options),
+          context: () => ({
+            $lib: 'to3mato-desktop',
+            $lib_version: app.getVersion(),
+            $os: process.platform === 'darwin' ? 'Mac OS X' : process.platform,
+            $os_version: process.getSystemVersion(),
+            $device_type: 'Desktop',
+            platform: 'desktop',
+            app_version: app.getVersion(),
+            locale: app.getLocale(),
+            signed_in: !!account?.session(),
+            sync_enabled: !!account?.active(),
+          }),
+          onError: (error) => console.warn('Analytics failed:', error),
+        });
+        const trackAll = (events) => {
+          for (const item of events)
+            analytics.track(item.event, item.properties);
+        };
         if (process.platform === 'darwin')
           app.dock.setIcon(path.join(root, 'electron/assets/icon.png'));
         protocol.handle('app', (request) => {
@@ -231,7 +270,10 @@ if (!app.requestSingleInstanceLock()) {
         });
         const commit = (next, backup = false, completion = null) => {
           if (backup) store.replace(next);
-          else store.save(next);
+          else {
+            store.save(next);
+            trackAll(recordEvents(state, next));
+          }
           state = next;
           broadcast();
           timerTray?.update();
@@ -299,11 +341,36 @@ if (!app.requestSingleInstanceLock()) {
             ].includes(command?.type)
           )
             throw new Error('Unauthorized tray command');
+          const before = state;
+          let result;
           try {
-            return await dispatch(command);
+            result = await dispatch(command);
           } catch (error) {
             throw new Error(error.message);
           }
+          const tracked = commandEvent(command, before);
+          if (tracked)
+            analytics.track(tracked.event, {
+              ...tracked.properties,
+              source:
+                event.sender === timerTray?.popover.webContents
+                  ? 'tray'
+                  : 'window',
+            });
+          return result;
+        });
+        ipcMain.handle('analytics:status', (event) => {
+          trusted(event);
+          return analytics.status();
+        });
+        ipcMain.handle('analytics:set', (event, enabled) => {
+          trusted(event);
+          return analytics.setEnabled(enabled === true);
+        });
+        ipcMain.handle('analytics:track', (event, name, properties) => {
+          trusted(event);
+          const tracked = rendererEvent(name, properties);
+          if (tracked) analytics.track(tracked.event, tracked.properties);
         });
         ipcMain.handle('data:export', async (event) => {
           trusted(event);
@@ -322,6 +389,7 @@ if (!app.requestSingleInstanceLock()) {
             snapshot.timer.running = false;
           }
           fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2));
+          analytics.track('data_exported');
           return true;
         });
         ipcMain.handle('video:export', async (event, bytes, filename) => {
@@ -343,6 +411,7 @@ if (!app.requestSingleInstanceLock()) {
           });
           if (canceled || !filePath) return false;
           await fs.promises.writeFile(filePath, Buffer.from(bytes));
+          analytics.track('video_exported', { format: extension });
           return true;
         });
         // Project cover images live beside the database and are read back
@@ -417,7 +486,11 @@ if (!app.requestSingleInstanceLock()) {
             JSON.parse(fs.readFileSync(file, 'utf8')),
           );
           if (imported.timer) imported.timer.running = false;
-          if (account?.active()) return account.importData(imported);
+          if (account?.active()) {
+            const merged = await account.importData(imported);
+            if (merged) analytics.track('data_imported');
+            return merged;
+          }
           const confirmation = await dialog.showMessageBox(window, {
             type: 'question',
             buttons: ['취소', '가져오기'],
@@ -428,6 +501,7 @@ if (!app.requestSingleInstanceLock()) {
               '기존 데이터는 to3mato.pre-import.sqlite3 파일에 보관됩니다.',
           });
           if (confirmation.response !== 1) return null;
+          analytics.track('data_imported');
           return commit(imported, true);
         });
         ipcMain.handle('onboarding:status', (event) => {
@@ -436,6 +510,7 @@ if (!app.requestSingleInstanceLock()) {
         });
         ipcMain.handle('onboarding:finish', (event) => {
           trusted(event);
+          if (onboarding.pending()) analytics.track('onboarding_finished');
           onboarding.finish();
         });
         const rituals = createRitualLedger(app.getPath('userData'));
@@ -460,6 +535,16 @@ if (!app.requestSingleInstanceLock()) {
         ipcMain.handle('ritual:finish', async (event, kind, date) => {
           trusted(event);
           if (!isRitualKind(kind) || !isRitualDate(date)) return false;
+          // Starting focus reports the plan again; count a day's ritual once.
+          const finished = account?.active()
+            ? account
+                .state()
+                .syncContext.extras.rituals.filter((row) => row.kind === kind)
+                .map((row) => row.date)
+                .sort()
+                .at(-1) || ''
+            : rituals.get().done[kind];
+          if (date > finished) analytics.track('ritual_finished', { kind });
           if (account?.active()) {
             await account.extra('rituals', `${date}:${kind}`, { kind, date });
             return true;
@@ -542,6 +627,9 @@ if (!app.requestSingleInstanceLock()) {
               next.syncContext?.controller === next.syncContext?.deviceId &&
               next.syncContext?.owner
             ) {
+              // Records pulled from another device were counted there.
+              if (previous.syncContext?.owner === next.syncContext.owner)
+                trackAll(recordEvents(previous, next));
               const added = next.records.some(
                 (record) =>
                   !previous.records.some((old) => old.id === record.id),
@@ -559,6 +647,7 @@ if (!app.requestSingleInstanceLock()) {
             window?.webContents.send('account:status', value),
           // The email link finishes in the browser. Bring the app back.
           onSignedIn: () => {
+            analytics.track('signed_in');
             if (!window) return;
             if (window.isMinimized()) window.restore();
             window.show();
@@ -592,10 +681,18 @@ if (!app.requestSingleInstanceLock()) {
             return result.response === 1 ? account.remove() : account.status();
           },
         };
+        const accountEvents = {
+          requestLink: 'login_link_requested',
+          enable: 'sync_enabled',
+          disable: 'sync_disabled',
+          logout: 'signed_out',
+        };
         for (const [method, handler] of Object.entries(accountMethods))
-          ipcMain.handle(`account:${method}`, (event, ...args) => {
+          ipcMain.handle(`account:${method}`, async (event, ...args) => {
             trusted(event);
-            return handler(...args);
+            const result = await handler(...args);
+            if (accountEvents[method]) analytics.track(accountEvents[method]);
+            return result;
           });
         const checkOwner = (owner) => {
           if (owner !== undefined && owner !== account.status().scope)
@@ -669,12 +766,26 @@ if (!app.requestSingleInstanceLock()) {
           stop: () => profile.stop(),
           copyLink: (slug) => profile.copyLink(slug),
         };
+        const profileEvents = {
+          save: 'profile_saved',
+          stop: 'profile_stopped',
+          copyLink: 'profile_link_copied',
+        };
         for (const [method, handler] of Object.entries(profileMethods))
-          ipcMain.handle(`profile:${method}`, (event, ...args) => {
+          ipcMain.handle(`profile:${method}`, async (event, ...args) => {
             trusted(event);
-            return handler(...args);
+            const result = await handler(...args);
+            if (profileEvents[method])
+              analytics.track(
+                profileEvents[method],
+                method === 'save' ? { active: result?.active === true } : {},
+              );
+            return result;
           });
         await account.restore();
+        analytics.track('app_opened', { first_launch: !existingInstall });
+        // Short sessions would otherwise quit before the first timed send.
+        void analytics.flush();
         Menu.setApplicationMenu(
           Menu.buildFromTemplate([
             ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
@@ -729,6 +840,7 @@ if (!app.requestSingleInstanceLock()) {
           updater?.destroy();
           timerTray?.destroy();
           notifications.destroy();
+          analytics.destroy();
           try {
             if (!account?.active())
               store.save(applyCommand(state, { type: 'timer:pause' }));

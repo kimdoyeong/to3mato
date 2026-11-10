@@ -88,6 +88,7 @@ test('profile page renders escaped name, meta tags and headers', async (t) => {
     ),
   );
   assert.ok(html.includes('<script src="/profile.js" defer></script>'));
+  assert.ok(html.includes('<script src="/analytics.js" defer></script>'));
   // Inline style attributes move into one hashed <style> element.
   assert.ok(!/ style="/.test(html));
   const css = html.match(/<style>([^<]*)<\/style>/)[1];
@@ -96,7 +97,7 @@ test('profile page renders escaped name, meta tags and headers', async (t) => {
   const policy = h.get('content-security-policy');
   assert.equal(
     policy,
-    `default-src 'none'; style-src 'self' 'sha256-${hash}'; font-src 'self'; script-src 'self'; img-src 'self' https://example.supabase.co; media-src https://example.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    `default-src 'none'; style-src 'self' 'sha256-${hash}'; font-src 'self'; script-src 'self' https://us-assets.i.posthog.com; connect-src https://us.i.posthog.com https://us-assets.i.posthog.com; img-src 'self' https://example.supabase.co; media-src https://example.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
   );
   assert.ok(!policy.includes('unsafe-inline'));
 });

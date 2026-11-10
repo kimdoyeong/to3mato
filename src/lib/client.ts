@@ -18,6 +18,10 @@ export const ready = writable(false);
 export const message = writable('');
 export const loadError = writable('');
 export const isDesktop = !!window.to3mato;
+/** Reports a usage event. The main process drops anything off its allowlist. */
+export function track(name: string, properties?: Record<string, string>) {
+  window.to3mato?.analytics.track(name, properties).catch(() => {});
+}
 let notification: ReturnType<typeof setTimeout>;
 export function notify(text: string) {
   message.set(text);

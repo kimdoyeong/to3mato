@@ -9,6 +9,7 @@
     initialize,
     send,
     notify,
+    track,
   } from './lib/client';
   import { localDate, usedPomodoros } from './lib/domain.mjs';
   import type { Project, Task } from './lib/types';
@@ -92,6 +93,9 @@
     ['log', '집중 로그', 'camera'],
     ['settings', '설정', 'settings'],
   ];
+  $effect(() => {
+    if ($ready) track('screen_viewed', { screen: reviewOpen ? 'review' : tab });
+  });
   onMount(() => {
     let disposed = false,
       cleanup: (() => void) | undefined;

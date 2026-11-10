@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { UpdateStatus } from '../lib/types';
+  import type { AnalyticsStatus, UpdateStatus } from '../lib/types';
   import {
     state as appState,
     send,
@@ -12,12 +12,21 @@
   } from '../lib/client';
   import WeekdayPicker from './WeekdayPicker.svelte';
   import AccountSettings from './AccountSettings.svelte';
+  import Switch from './parts/Switch.svelte';
   let { onreview }: { onreview: () => void } = $props();
   import Tomato from './Tomato.svelte';
   let input: HTMLInputElement;
   let version = $state('');
   let update = $state<UpdateStatus>({ status: 'idle' });
   let restarting = $state(false);
+  let analytics = $state<AnalyticsStatus>({ available: false, enabled: false });
+  async function setAnalytics(enabled: boolean) {
+    try {
+      analytics = await window.to3mato!.analytics.setEnabled(enabled);
+    } catch {
+      notify('설정을 저장하지 못했습니다.');
+    }
+  }
   const updateError =
     '업데이트를 확인하지 못했습니다. 네트워크 연결을 확인하세요.';
   onMount(() => {
@@ -31,6 +40,12 @@
       .catch(() => {
         if (active) update = { status: 'error', message: updateError };
       });
+    window.to3mato.analytics
+      .status()
+      .then((value) => {
+        if (active) analytics = value;
+      })
+      .catch(() => {});
     const unsubscribe = window.to3mato.update.subscribe((value) => {
       update = value;
       if (value.status === 'error') restarting = false;
@@ -180,6 +195,19 @@
     }}
   />
 </section>
+{#if analytics.available}
+  <section class="settings-card" aria-labelledby="analytics-title">
+    <h2 id="analytics-title">사용 통계</h2>
+    <div class="setting-row">
+      <span id="analytics-label">사용 통계 전송</span>
+      <Switch
+        checked={analytics.enabled}
+        labelledby="analytics-label"
+        onchange={setAnalytics}
+      />
+    </div>
+  </section>
+{/if}
 {#if isDesktop}
   <section class="settings-card" aria-labelledby="update-title">
     <h2 id="update-title">업데이트</h2>

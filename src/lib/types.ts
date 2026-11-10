@@ -113,6 +113,7 @@ export type PublicProfile = {
   visibility: Visibility;
   active: boolean;
 };
+export type AnalyticsStatus = { available: boolean; enabled: boolean };
 export type Command = { type: string; payload?: Record<string, unknown> };
 export type UpdateStatus =
   | { status: 'idle' | 'checking' }
@@ -180,6 +181,11 @@ declare global {
         removeVideos(): Promise<void>;
         stop(): Promise<PublicProfile | null>;
         copyLink(slug: string): Promise<boolean>;
+      };
+      analytics: {
+        status(): Promise<AnalyticsStatus>;
+        setEnabled(enabled: boolean): Promise<AnalyticsStatus>;
+        track(name: string, properties?: Record<string, string>): Promise<void>;
       };
       version(): Promise<string>;
       update: {

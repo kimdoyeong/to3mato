@@ -1,6 +1,6 @@
 # To3mato 정적 사이트
 
-실제 Electron 앱을 촬영한 화면을 사용하는 랜딩·소개·다운로드 페이지입니다. HTML과 CSS만 사용합니다. 서버 기능과 JavaScript 런타임 및 외부 CDN 없이 동작합니다.
+실제 Electron 앱을 촬영한 화면을 사용하는 랜딩·소개·다운로드 페이지입니다. HTML과 CSS로 동작하며 서버 기능은 없습니다. JavaScript는 방문 통계용 `assets/analytics.js` 하나뿐입니다. 이 스크립트는 프로젝트 토큰이 비어 있거나 로컬 미리보기일 때 아무것도 불러오지 않습니다. 토큰이 있으면 PostHog 스크립트를 불러와 쿠키와 브라우저 저장소 없이 방문과 다운로드 클릭을 셉니다.
 
 ## 미리보기
 
@@ -22,6 +22,7 @@ python3 -m http.server 4175 --bind 127.0.0.1 --directory website/dist
 - `dist/about.html`: 계획 철학, 타이머, 3초 집중 로그·월요일 영상 배달과 현재 기능 소개
 - `dist/download.html`: 설치 파일과 설치 방법 및 지원 환경
 - `dist/assets/site.css`: 반응형 공통 스타일
+- `dist/assets/analytics.js`: 방문 통계. 토큰과 호스트는 `src/lib/analytics.mjs`와 같은 값으로 유지합니다. 공개 프로필 Worker도 이 파일을 그대로 씁니다.
 - `dist/assets/*.png`: 예시 데이터로 촬영한 실제 앱 화면과 기존 앱 아이콘
 - `dist/assets/mascot.svg`: 앱에서 사용하는 토마토 캐릭터 원본
 - `dist/downloads/`: 실제 macOS 설치 파일과 SHA-256 및 릴리스 정보

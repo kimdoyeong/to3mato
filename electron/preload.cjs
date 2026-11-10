@@ -57,6 +57,12 @@ contextBridge.exposeInMainWorld('to3mato', {
     stop: () => ipcRenderer.invoke('profile:stop'),
     copyLink: (slug) => ipcRenderer.invoke('profile:copyLink', slug),
   },
+  analytics: {
+    status: () => ipcRenderer.invoke('analytics:status'),
+    setEnabled: (enabled) => ipcRenderer.invoke('analytics:set', enabled),
+    track: (name, properties) =>
+      ipcRenderer.invoke('analytics:track', name, properties),
+  },
   version: () => ipcRenderer.invoke('app:version'),
   update: {
     check: () => ipcRenderer.invoke('update:check'),

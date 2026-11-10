@@ -6,6 +6,7 @@ import {
   profileUrl,
   renderProfile,
 } from '../../../src/lib/public-profile.mjs';
+import { POSTHOG_KEY, POSTHOG_HOST } from '../../../src/lib/analytics.mjs';
 
 const SLUG = /^[a-hjkmnp-z2-9]{10}$/;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
@@ -36,13 +37,19 @@ function supabaseOrigin(env) {
   }
 }
 
-function csp(origin, styleHashes = []) {
+// View counting is off until a project token is set. /analytics.js loads the
+// PostHog script from the assets host and posts events to the API host.
+const ANALYTICS_HOST = POSTHOG_KEY ? POSTHOG_HOST : '';
+
+export function csp(origin, styleHashes = [], analyticsHost = '') {
   const styles = ["'self'", ...styleHashes.map((hash) => `'sha256-${hash}'`)];
+  const assets = analyticsHost.replace('.i.posthog.com', '-assets.i.posthog.com');
   return [
     "default-src 'none'",
     `style-src ${styles.join(' ')}`,
     "font-src 'self'",
-    "script-src 'self'",
+    `script-src 'self'${analyticsHost ? ` ${assets}` : ''}`,
+    ...(analyticsHost ? [`connect-src ${analyticsHost} ${assets}`] : []),
     `img-src 'self'${origin ? ` ${origin}` : ''}`,
     `media-src ${origin || "'none'"}`,
     "base-uri 'none'",
@@ -232,12 +239,13 @@ export async function renderPage(raw, slug, origin, now = new Date()) {
     ...STYLESHEETS.map((href) => `<link rel="stylesheet" href="${href}">`),
     css ? `<style>${css}</style>` : '',
     '<script src="/profile.js" defer></script>',
+    ANALYTICS_HOST ? '<script src="/analytics.js" defer></script>' : '',
   ]
     .filter(Boolean)
     .join('\n');
   return {
     html: page(head, body),
-    policy: csp(origin, css ? [await sha256(css)] : []),
+    policy: csp(origin, css ? [await sha256(css)] : [], ANALYTICS_HOST),
   };
 }
 

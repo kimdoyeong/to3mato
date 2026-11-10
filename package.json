@@ -42,6 +42,7 @@
       "src/lib/domain.mjs",
       "src/lib/calendar-time.mjs",
       "src/lib/public-profile.mjs",
+      "src/lib/analytics.mjs",
       "src/lib/sync/**/*.mjs",
       "src/styles/tokens.css",
       "package.json"

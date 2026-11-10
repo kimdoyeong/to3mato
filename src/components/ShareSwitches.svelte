@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import Switch from './parts/Switch.svelte';
   import { COPY } from '../lib/share-copy';
   import type { Visibility } from '../lib/types';
   let {
@@ -32,15 +33,12 @@
   {#each rows as [key, label] (key)}
     <li class="share-row" class:sub={key === 'memo'}>
       <span id="{id}-{key}">{label}</span>
-      <button
-        type="button"
-        class="sw"
-        role="switch"
-        aria-checked={value[key]}
-        aria-labelledby="{id}-{key}"
+      <Switch
+        checked={value[key]}
+        labelledby="{id}-{key}"
         disabled={disabled || (key === 'memo' && !value.tasks)}
-        onclick={() => onchange(key, !value[key])}
-      ></button>
+        onchange={(next) => onchange(key, next)}
+      />
     </li>
   {/each}
 </ul>
@@ -89,47 +87,5 @@
     border-left: 2px solid var(--line-strong);
     border-bottom: 2px solid var(--line-strong);
     border-radius: 0 0 0 8px;
-  }
-  /* 스위치: 손그림 알약 + 토마토 손잡이 */
-  .sw {
-    position: relative;
-    flex-shrink: 0;
-    width: 50px;
-    height: 28px;
-    padding: 0;
-    border: 2px solid var(--line-strong);
-    border-radius: 15px 17px 14px 16px / 16px 14px 17px 15px;
-    background: #fff;
-    transition:
-      background 0.15s,
-      border-color 0.15s;
-  }
-  .sw::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 18px;
-    height: 18px;
-    border-radius: var(--blob);
-    background: var(--stroke-soft);
-    transition: transform 0.18s;
-  }
-  .sw[aria-checked='true'] {
-    background: var(--tomato);
-    border-color: var(--red);
-  }
-  .sw[aria-checked='true']::after {
-    transform: translateX(22px);
-    background: #fff;
-  }
-  .sw:disabled {
-    opacity: 0.4;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .sw,
-    .sw::after {
-      transition: none;
-    }
   }
 </style>

@@ -46,6 +46,8 @@ await font('poor-story');
 await font('gamja-flower');
 await cp(join(statics, 'page.css'), join(out, 'styles/page.css'));
 await cp(join(statics, 'profile.js'), join(out, 'profile.js'));
+// The same visit-count script the website serves.
+await copy('website/dist/assets/analytics.js', 'analytics.js');
 await cp(join(statics, '_headers'), join(out, '_headers'));
 
 const { total, count } = await size(out);
