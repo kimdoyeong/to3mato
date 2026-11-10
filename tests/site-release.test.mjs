@@ -45,7 +45,7 @@ test('site is generated from verified release without changing copy or bundling 
     /https:\/\/downloads\.to3mato\.doyeong\.dev\/To3mato-0\.4\.2-arm64\.dmg/,
   );
   assert.match(html, /DMG · 0\.0 MB · arm64/);
-  assert.match(html, /v0\.7\.0 · 2026\.11\.08/); // Existing release notes remain intact.
+  assert.match(html, /v0\.7\.1 · 2026\.11\.10/); // Existing release notes remain intact.
   assert.doesNotMatch(html, /v0\.3\.0|To3mato-0\.3\.0/);
   assert.deepEqual(
     (await fs.readdir(path.join(options.output, 'downloads'))).sort(),
